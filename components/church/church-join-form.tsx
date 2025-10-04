@@ -9,7 +9,7 @@ import { Video, Loader2 } from "lucide-react";
 interface ChurchJoinFormProps {
   onJoined: (data: {
     token: string;
-    roomName: string;
+    roomUrl: string;
     churchName: string;
     serviceName: string;
   }) => void;
@@ -65,7 +65,7 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
 
       onJoined({
         token: tokenData.token,
-        roomName: tokenData.roomName,
+        roomUrl: tokenData.roomUrl,
         churchName: joinData.church.name,
         serviceName: joinData.service.name,
       });

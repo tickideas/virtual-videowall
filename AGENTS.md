@@ -1,6 +1,6 @@
 # Virtual Video Wall
 
-A low-bandwidth optimized virtual video wall platform for connecting 50-60 churches during zonal meetings. Built with Next.js 15, LiveKit, and optimized for 300-500 Kbps connections.
+A low-bandwidth optimized virtual video wall platform for connecting 50-60 churches during zonal meetings. Built with Next.js 15, Daily.co, and optimized for 300-500 Kbps connections.
 
 ## Core Commands
 
@@ -12,7 +12,7 @@ A low-bandwidth optimized virtual video wall platform for connecting 50-60 churc
 • View database: `npm run db:studio`
 • Generate Prisma client: `npm run db:generate`
 
-Database must be running before executing any `db:*` commands. Use `docker-compose up -d` to start PostgreSQL and LiveKit.
+Database must be running before executing any `db:*` commands. Use `docker-compose up -d` to start PostgreSQL.
 
 ## Project Layout
 
@@ -22,7 +22,6 @@ Database must be running before executing any `db:*` commands. Use `docker-compo
 │  ├─ wall/                → Video wall display (paginated grid)
 │  ├─ admin/               → Admin portal (dashboard & management)
 │  └─ api/                 → API routes
-│     ├─ livekit/          → LiveKit token generation
 │     ├─ session/          → Session join/leave
 │     ├─ service/          → Service management
 │     └─ auth/             → Authentication
@@ -33,7 +32,7 @@ Database must be running before executing any `db:*` commands. Use `docker-compo
 │  └─ admin/               → Admin components
 ├─ lib/                     → Utilities and helpers
 │  ├─ prisma.ts            → Prisma client singleton
-│  ├─ livekit.ts           → LiveKit utilities & config
+│  ├─ daily.ts             → Daily.co utilities & config
 │  ├─ utils.ts             → Helper functions
 │  └─ auth.ts              → Authentication helpers
 ├─ prisma/                  → Database schema & seeds
@@ -57,7 +56,7 @@ Database must be running before executing any `db:*` commands. Use `docker-compo
 • **React Server Components** for admin pages where possible
 • **Client components** only when using hooks or browser APIs
 • **Prisma ORM** for all database queries (no raw SQL)
-• **LiveKit** for WebRTC (no direct WebRTC APIs)
+• **Daily.co** for WebRTC (using @daily-co/daily-js SDK)
 • **Tailwind CSS** for styling (no CSS modules or styled-components)
 
 ### Coding Style
@@ -117,18 +116,18 @@ export async function POST(request: NextRequest) {
 4. Regenerate client: `npm run db:generate`
 5. Test queries in Prisma Studio: `npm run db:studio`
 
-### LiveKit Configuration
+### Daily.co Configuration
 
-• Video quality settings are in `livekit.yaml` **not** in code
-• Token generation must use `lib/livekit.ts` helpers
-• Room options defined in `ROOM_OPTIONS` constant
+• Video quality settings configured in room creation via API
+• Room creation must use `lib/daily.ts` helpers
+• Room options defined in API calls to Daily.co
 • Never hardcode API keys; use environment variables
 
 ## File Naming Conventions
 
 • React components: `PascalCase.tsx` (e.g., `ChurchRoom.tsx`)
 • API routes: `route.ts` in folder (e.g., `api/session/join/route.ts`)
-• Utilities: `kebab-case.ts` (e.g., `livekit.ts`)
+• Utilities: `kebab-case.ts` (e.g., `daily.ts`)
 • Pages: `page.tsx` in folder (e.g., `app/church/page.tsx`)
 • Types: inline or in same file, not separate `.types.ts`
 
@@ -226,15 +225,17 @@ A pull request is reviewable when it includes:
 - Remove pagination from wall display (must stay at 20 per page)
 - Enable audio by default
 - Add database queries without indexes on frequently queried fields
-- Expose LiveKit API keys in client-side code
+- Expose Daily.co API keys in client-side code
 - Create new database models without updating seed script
 - Deploy without testing on mobile devices
 - Commit `.env` file with real credentials
+- Create multiple DailyIframe instances in same component
 
 ✅ **ALWAYS**:
 - Use Prisma for database queries (type-safe)
-- Use `lib/livekit.ts` helpers for token generation
+- Use `lib/daily.ts` helpers for room management
 - Use `lib/utils.ts` for shared utilities
+- Use `useRef` to prevent duplicate Daily instances
 - Test on both desktop and mobile
 - Check bandwidth usage for church interface changes
 - Update documentation when changing user-facing behavior
@@ -248,10 +249,8 @@ Required variables (see `.env.example`):
 DATABASE_URL=postgresql://...
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=<generate-unique>
-LIVEKIT_URL=ws://localhost:7880
-LIVEKIT_API_KEY=<generate-unique>
-LIVEKIT_API_SECRET=<generate-unique>
-NEXT_PUBLIC_LIVEKIT_URL=ws://localhost:7880  # Client-side
+DAILY_API_KEY=<your-daily-api-key>
+NEXT_PUBLIC_DAILY_DOMAIN=<your-domain.daily.co>  # Client-side
 ```
 
 - Server-side vars: No `NEXT_PUBLIC_` prefix
@@ -260,17 +259,17 @@ NEXT_PUBLIC_LIVEKIT_URL=ws://localhost:7880  # Client-side
 
 ## Common Pitfalls
 
-### 1. LiveKit Connection Issues
-**Symptom**: Churches can't connect, "Failed to generate token"
-**Fix**: Check `LIVEKIT_URL` and `NEXT_PUBLIC_LIVEKIT_URL` match server address
+### 1. Daily.co Room Creation Issues
+**Symptom**: Churches can't connect, "Failed to create room"
+**Fix**: Check `DAILY_API_KEY` is valid and domain is correct
 
 ### 2. Database Connection Errors
 **Symptom**: `Can't reach database server`
 **Fix**: Ensure PostgreSQL running: `docker-compose up -d postgres`
 
-### 3. Video Quality Too High
-**Symptom**: Churches complain about buffering
-**Fix**: Verify `livekit.yaml` has `bitrate: 250000` and `framerate: 8`
+### 3. Duplicate DailyIframe Instances
+**Symptom**: Console error about duplicate instances
+**Fix**: Ensure component uses `useRef` to prevent re-initialization (see church-room-daily.tsx)
 
 ### 4. Wall Display Shows > 20 Churches
 **Symptom**: Performance degrades, bandwidth spikes

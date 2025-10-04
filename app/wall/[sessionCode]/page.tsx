@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { WallDisplay } from "@/components/wall/wall-display";
+import { WallDisplay } from "@/components/wall/wall-display-daily";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 
@@ -30,6 +30,7 @@ export default function WallPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [token, setToken] = useState<string | null>(null);
+  const [roomUrl, setRoomUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchService = async () => {
@@ -53,6 +54,7 @@ export default function WallPage({
         if (tokenResponse.ok) {
           const tokenData = await tokenResponse.json();
           setToken(tokenData.token);
+          setRoomUrl(tokenData.roomUrl);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load service");
@@ -91,7 +93,7 @@ export default function WallPage({
     );
   }
 
-  if (!token) {
+  if (!token || !roomUrl) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="text-center">
@@ -105,7 +107,7 @@ export default function WallPage({
   return (
     <WallDisplay
       token={token}
-      roomName={service.id}
+      roomUrl={roomUrl}
       serviceName={service.name}
       sessionCode={resolvedParams.sessionCode}
     />

@@ -14,73 +14,154 @@ interface ChurchRoomProps {
 }
 
 export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }: ChurchRoomProps) {
+  const callObjectRef = useRef<DailyCall | null>(null);
   const [callObject, setCallObject] = useState<DailyCall | null>(null);
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   const [connectionQuality, setConnectionQuality] = useState<"good" | "low" | "very-low">("good");
   const [isJoined, setIsJoined] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const destroyPromiseRef = useRef<Promise<void> | null>(null);
 
   // Initialize Daily.co call
   useEffect(() => {
+    if (!token || !roomUrl) {
+      return;
+    }
+
+    let isMounted = true;
+    const handleJoinedMeeting = () => {
+      if (!isMounted) {
+        return;
+      }
+      console.log("Church: Joined meeting successfully");
+      setIsJoined(true);
+    };
+
+    const handleLeftMeeting = () => {
+      if (!isMounted) {
+        return;
+      }
+      console.log("Church: Left meeting");
+      setIsJoined(false);
+      onLeave();
+    };
+
+    const handleParticipantUpdated = (event: DailyEventObjectParticipant) => {
+      if (!isMounted || !event.participant.local) {
+        return;
+      }
+      console.log("Church: Local participant updated", event.participant);
+      setIsCameraEnabled(event.participant.video || false);
+    };
+
+    const handleNetworkQualityChange = (event: { threshold: string; quality: number }) => {
+      if (!isMounted) {
+        return;
+      }
+      console.log("Church: Network quality", event.quality);
+      const quality = event.quality >= 80 ? "good" : event.quality >= 50 ? "low" : "very-low";
+      setConnectionQuality(quality);
+    };
+
+    const handleError = (error: { errorMsg: string; error?: Error }) => {
+      console.error("Church: Daily.co error", error);
+    };
+
+    const attachListeners = (daily: DailyCall) => {
+      daily.on("joined-meeting", handleJoinedMeeting);
+      daily.on("left-meeting", handleLeftMeeting);
+      daily.on("participant-updated", handleParticipantUpdated);
+      daily.on("network-quality-change", handleNetworkQualityChange);
+      daily.on("error", handleError);
+    };
+
+    const detachListeners = (daily: DailyCall) => {
+      daily.off("joined-meeting", handleJoinedMeeting);
+      daily.off("left-meeting", handleLeftMeeting);
+      daily.off("participant-updated", handleParticipantUpdated);
+      daily.off("network-quality-change", handleNetworkQualityChange);
+      daily.off("error", handleError);
+    };
+
     const initializeCall = async () => {
       try {
-        console.log("Church: Initializing Daily.co call...");
-        
-        // Create call object
-        const daily = DailyIframe.createCallObject({
-          videoSource: true,
-          audioSource: false, // Microphone off by default
-        });
+        if (destroyPromiseRef.current) {
+          console.log("Church: Waiting for previous Daily call cleanup to finish");
+          await destroyPromiseRef.current;
+        }
 
-        setCallObject(daily);
-
-        // Set up event listeners
-        daily
-          .on("joined-meeting", () => {
-            console.log("Church: Joined meeting successfully");
-            setIsJoined(true);
-          })
-          .on("left-meeting", () => {
-            console.log("Church: Left meeting");
-            setIsJoined(false);
-            onLeave();
-          })
-          .on("participant-updated", (event: DailyEventObjectParticipant) => {
-            if (event.participant.local) {
-              console.log("Church: Local participant updated", event.participant);
-              setIsCameraEnabled(event.participant.video || false);
+        if (!callObjectRef.current) {
+          const existingInstance = DailyIframe.getCallInstance?.();
+          if (existingInstance) {
+            console.log("Church: Destroying leftover Daily call instance before creating new one");
+            try {
+              await existingInstance.destroy();
+            } catch (destroyError) {
+              console.error("Church: Failed to destroy leftover call instance", destroyError);
             }
-          })
-          .on("network-quality-change", (event) => {
-            console.log("Church: Network quality", event.quality);
-            setConnectionQuality(event.quality as "good" | "low" | "very-low");
-          })
-          .on("error", (error) => {
-            console.error("Church: Daily.co error", error);
+          }
+
+          console.log("Church: Initializing Daily.co call...");
+          
+          // Request camera with low-bandwidth constraints
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 240 },
+              height: { ideal: 180 },
+              frameRate: { ideal: 8, max: 8 },
+              facingMode: "user",
+            },
+            audio: false,
           });
 
-        // Join the room
+          callObjectRef.current = DailyIframe.createCallObject({
+            videoSource: stream.getVideoTracks()[0],
+            audioSource: false, // Microphone off by default
+          });
+        }
+
+        const daily = callObjectRef.current;
+        if (!daily) {
+          return;
+        }
+
+        setCallObject(daily);
+        attachListeners(daily);
+
         console.log("Church: Joining room", roomUrl);
         await daily.join({
           url: roomUrl,
           token,
         });
 
-        // Set video quality to low bandwidth (240x180 @ 8fps)
-        await daily.setInputDevicesAsync({
-          videoSource: {
-            width: { ideal: 240 },
-            height: { ideal: 180 },
-            frameRate: { ideal: 8 },
+        // Disable video processors to reduce CPU load
+        await daily.updateInputSettings({
+          video: {
+            processor: {
+              type: "none",
+            },
           },
         });
 
-        // Enable camera
+        // Ensure video is on and audio is off
         await daily.setLocalVideo(true);
-        await daily.setLocalAudio(false); // Keep audio off
+        await daily.setLocalAudio(false);
 
-        console.log("Church: Camera enabled");
+        // Set send settings for maximum bandwidth savings
+        await daily.updateSendSettings({
+          video: {
+            maxQuality: "low",
+            encodings: {
+              low: {
+                maxBitrate: 400000, // 400 Kbps max
+                maxFramerate: 8,
+                scaleResolutionDownBy: 1,
+              },
+            },
+          },
+        });
 
+        console.log("Church: Camera enabled with low-bandwidth settings (240x180 @ 8fps)");
       } catch (error) {
         console.error("Church: Failed to initialize call", error);
       }
@@ -90,10 +171,29 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
 
     // Cleanup
     return () => {
-      if (callObject) {
+      isMounted = false;
+
+      const daily = callObjectRef.current;
+      if (daily) {
+        detachListeners(daily);
         console.log("Church: Cleaning up call object");
-        callObject.destroy();
+        const destroyPromise = daily.destroy().catch((err) => {
+          console.error("Church: Error destroying call object", err);
+        });
+
+        destroyPromiseRef.current = destroyPromise;
+        destroyPromise.finally(() => {
+          if (destroyPromiseRef.current === destroyPromise) {
+            destroyPromiseRef.current = null;
+          }
+        });
+
+        callObjectRef.current = null;
+        setCallObject(null);
       }
+
+      setIsJoined(false);
+      setIsCameraEnabled(false);
     };
   }, [token, roomUrl, onLeave]);
 

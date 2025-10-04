@@ -1,6 +1,6 @@
 # Virtual Video Wall
 
-A low-bandwidth optimized virtual video wall platform for connecting 50-60 churches during zonal meetings. Built with Next.js 15, LiveKit, and optimized for 300-500 Kbps connections.
+A low-bandwidth optimized virtual video wall platform for connecting 50-60 churches during zonal meetings. Built with Next.js 15, Daily.co, and optimized for 300-500 Kbps connections.
 
 **🚀 [Quick Start →](./QUICKSTART.md)** | **📖 [Full Spec →](./SPEC.md)** | **🚢 [Deployment →](./DEPLOYMENT.md)** | **🤖 [Agent Guide →](./AGENTS.md)**
 
@@ -16,7 +16,7 @@ A low-bandwidth optimized virtual video wall platform for connecting 50-60 churc
 
 - **Frontend/Backend**: Next.js 15 + TypeScript
 - **Database**: PostgreSQL + Prisma ORM
-- **WebRTC**: LiveKit (self-hosted)
+- **WebRTC**: Daily.co (cloud-hosted)
 - **Styling**: Tailwind CSS
 - **Deployment**: Coolify / Docker
 
@@ -26,7 +26,7 @@ A low-bandwidth optimized virtual video wall platform for connecting 50-60 churc
 
 - Node.js 20+
 - PostgreSQL 16+
-- LiveKit Server (Docker)
+- Daily.co account (free tier available)
 
 ### Installation
 
@@ -62,7 +62,6 @@ docker-compose up -d
 
 This starts:
 - PostgreSQL on port 5432
-- LiveKit Server on ports 7880, 7881, 50000-60000
 - Next.js app on port 3000
 
 ## Default Admin Credentials
@@ -120,7 +119,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
   /wall            - Wall display components
 /lib
   prisma.ts        - Database client
-  livekit.ts       - LiveKit utilities
+  daily.ts         - Daily.co utilities
   utils.ts         - Helper functions
 /prisma
   schema.prisma    - Database schema
@@ -132,10 +131,8 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
 DATABASE_URL=postgresql://user:password@localhost:5432/videowall
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=your-secret-here
-LIVEKIT_URL=ws://localhost:7880
-LIVEKIT_API_KEY=your-api-key
-LIVEKIT_API_SECRET=your-api-secret
-NEXT_PUBLIC_LIVEKIT_URL=ws://localhost:7880
+DAILY_API_KEY=your-daily-api-key
+NEXT_PUBLIC_DAILY_DOMAIN=your-domain.daily.co
 ```
 
 ## Scripts

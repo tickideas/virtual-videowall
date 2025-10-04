@@ -2,31 +2,31 @@
 
 import { useState } from "react";
 import { ChurchJoinForm } from "@/components/church/church-join-form";
-import { ChurchRoom } from "@/components/church/church-room";
+import { ChurchRoom } from "@/components/church/church-room-daily";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 export default function ChurchPage() {
   const [token, setToken] = useState<string | null>(null);
-  const [roomName, setRoomName] = useState<string | null>(null);
+  const [roomUrl, setRoomUrl] = useState<string | null>(null);
   const [churchName, setChurchName] = useState<string | null>(null);
   const [serviceName, setServiceName] = useState<string | null>(null);
 
   const handleJoined = (data: {
     token: string;
-    roomName: string;
+    roomUrl: string;
     churchName: string;
     serviceName: string;
   }) => {
     setToken(data.token);
-    setRoomName(data.roomName);
+    setRoomUrl(data.roomUrl);
     setChurchName(data.churchName);
     setServiceName(data.serviceName);
   };
 
   const handleLeave = () => {
     setToken(null);
-    setRoomName(null);
+    setRoomUrl(null);
     setChurchName(null);
     setServiceName(null);
   };
@@ -47,7 +47,7 @@ export default function ChurchPage() {
       ) : (
         <ChurchRoom
           token={token}
-          roomName={roomName!}
+          roomUrl={roomUrl!}
           churchName={churchName!}
           serviceName={serviceName!}
           onLeave={handleLeave}
