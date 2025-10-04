@@ -84,7 +84,7 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
         </div>
 
         <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">
-          Join Video Wall
+          Join the Zonal Videowall
         </h1>
         <p className="text-center text-gray-600 mb-8">
           Enter your codes to connect to the service
@@ -115,7 +115,7 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
             <Input
               id="churchName"
               type="text"
-              placeholder="First Baptist Church"
+              placeholder="Loveworld Telford"
               value={churchName}
               onChange={(e) => setChurchName(e.target.value)}
               required

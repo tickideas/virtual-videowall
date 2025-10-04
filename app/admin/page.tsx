@@ -100,18 +100,7 @@ export default function AdminLoginPage() {
           </Button>
         </form>
 
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-          <p className="text-xs text-blue-900 font-medium">
-            Default credentials (first time setup):
-          </p>
-          <p className="text-xs text-blue-700 mt-1">
-            Email: admin@example.com<br />
-            Password: admin123
-          </p>
-          <p className="text-xs text-blue-600 mt-2">
-            Please change these after first login!
-          </p>
-        </div>
+        
       </div>
     </div>
   );

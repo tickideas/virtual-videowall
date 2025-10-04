@@ -83,11 +83,22 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       daily.off("error", handleError);
     };
 
+    const stopStreamTracks = (stream: MediaStream | null) => {
+      stream?.getTracks().forEach((track) => {
+        track.stop();
+      });
+    };
+
     const initializeCall = async () => {
+      let acquiredStream: MediaStream | null = null;
       try {
         if (destroyPromiseRef.current) {
           console.log("Church: Waiting for previous Daily call cleanup to finish");
           await destroyPromiseRef.current;
+        }
+
+        if (!isMounted) {
+          return;
         }
 
         if (!callObjectRef.current) {
@@ -114,14 +125,25 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
             audio: false,
           });
 
+          if (!isMounted) {
+            stopStreamTracks(stream);
+            return;
+          }
+
+          acquiredStream = stream;
+
           callObjectRef.current = DailyIframe.createCallObject({
             videoSource: stream.getVideoTracks()[0],
             audioSource: false, // Microphone off by default
           });
+          acquiredStream = null;
         }
 
         const daily = callObjectRef.current;
-        if (!daily) {
+        if (!daily || !isMounted) {
+          if (!isMounted) {
+            stopStreamTracks(acquiredStream);
+          }
           return;
         }
 
@@ -134,14 +156,23 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
           token,
         });
 
-        // Disable video processors to reduce CPU load
-        await daily.updateInputSettings({
-          video: {
-            processor: {
-              type: "none",
+        if (!isMounted) {
+          return;
+        }
+
+        // Disable video processors to reduce CPU load when supported
+        const supportsProcessors = DailyIframe.supportedBrowser?.().supportsInputMediaProcessors ?? false;
+        if (supportsProcessors) {
+          await daily.updateInputSettings({
+            video: {
+              processor: {
+                type: "none",
+              },
             },
-          },
-        });
+          });
+        } else {
+          console.log("Church: Skipping video processor settings (not supported in this browser)");
+        }
 
         // Ensure video is on and audio is off
         await daily.setLocalVideo(true);
@@ -164,6 +195,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
         console.log("Church: Camera enabled with low-bandwidth settings (240x180 @ 8fps)");
       } catch (error) {
         console.error("Church: Failed to initialize call", error);
+        stopStreamTracks(acquiredStream);
       }
     };
 

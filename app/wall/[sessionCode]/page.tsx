@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { WallDisplay } from "@/components/wall/wall-display-daily";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -31,8 +31,17 @@ export default function WallPage({
   const [error, setError] = useState("");
   const [token, setToken] = useState<string | null>(null);
   const [roomUrl, setRoomUrl] = useState<string | null>(null);
+  const tokenRequestedRef = useRef(false);
 
   useEffect(() => {
+    tokenRequestedRef.current = false;
+    setToken(null);
+    setRoomUrl(null);
+  }, [resolvedParams.sessionCode]);
+
+  useEffect(() => {
+    let isMounted = true;
+
     const fetchService = async () => {
       try {
         const response = await fetch(`/api/service/${resolvedParams.sessionCode}`);
@@ -40,8 +49,40 @@ export default function WallPage({
           throw new Error("Service not found");
         }
         const data = await response.json();
-        setService(data.service);
 
+        if (isMounted) {
+          setService(data.service);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : "Failed to load service");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchService();
+    const interval = setInterval(fetchService, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [resolvedParams.sessionCode]);
+
+  useEffect(() => {
+    if (!service || tokenRequestedRef.current) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchToken = async () => {
+      try {
+        tokenRequestedRef.current = true;
         const tokenResponse = await fetch("/api/livekit/token", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -53,20 +94,26 @@ export default function WallPage({
 
         if (tokenResponse.ok) {
           const tokenData = await tokenResponse.json();
-          setToken(tokenData.token);
-          setRoomUrl(tokenData.roomUrl);
+          if (isMounted) {
+            setToken(tokenData.token);
+            setRoomUrl(tokenData.roomUrl);
+          }
+        } else if (isMounted) {
+          setError("Failed to retrieve video token");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load service");
-      } finally {
-        setLoading(false);
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : "Failed to retrieve video token");
+        }
       }
     };
 
-    fetchService();
-    const interval = setInterval(fetchService, 5000);
-    return () => clearInterval(interval);
-  }, [resolvedParams.sessionCode]);
+    fetchToken();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [service, resolvedParams.sessionCode]);
 
   if (loading) {
     return (

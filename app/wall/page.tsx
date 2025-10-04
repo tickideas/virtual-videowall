@@ -72,17 +72,7 @@ export default function WallLandingPage() {
             </Button>
           </form>
 
-          <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-700 font-medium mb-2">
-              Display Features:
-            </p>
-            <ul className="text-xs text-gray-600 space-y-1">
-              <li>• Paginated view (20 churches per page)</li>
-              <li>• Auto-navigation between pages</li>
-              <li>• Fullscreen mode available</li>
-              <li>• Optimized for 6-8 Mbps connection</li>
-            </ul>
-          </div>
+         
         </div>
       </div>
     </div>

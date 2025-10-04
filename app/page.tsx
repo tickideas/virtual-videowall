@@ -7,10 +7,10 @@ export default function HomePage() {
       <div className="max-w-4xl w-full text-center space-y-8">
         <div className="space-y-4">
           <h1 className="text-5xl font-bold text-gray-900">
-            Virtual Video Wall
+            UKZ1 Church VideoWall
           </h1>
           <p className="text-xl text-gray-600">
-            Connect churches through video for zonal meetings
+            Connecting churches through video for zonal meetings
           </p>
         </div>
 
@@ -67,10 +67,7 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="mt-12 text-sm text-gray-500">
-          <p>Optimized for low bandwidth (300-500 Kbps)</p>
-          <p className="mt-2">Supports up to 60 simultaneous churches</p>
-        </div>
+        
       </div>
     </div>
   );

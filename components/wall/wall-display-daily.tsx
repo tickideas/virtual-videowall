@@ -20,81 +20,202 @@ interface VideoTileProps {
 function VideoTile({ participant, callObject }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasVideo, setHasVideo] = useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
+  const lastTrackIdRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (!videoRef.current || !callObject || !participant) {
+  const handleManualPlay = useCallback(async () => {
+    if (!videoRef.current) {
       return;
     }
 
-    const updateVideoTrack = () => {
-      const videoTrack = participant.tracks?.video?.track;
-      
-      if (videoTrack && videoTrack.readyState === "live") {
-        // Clean up old stream
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-        }
-        
-        // Create new stream with current track
-        const stream = new MediaStream([videoTrack]);
-        streamRef.current = stream;
-        
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          setHasVideo(true);
-        }
-      } else {
-        setHasVideo(false);
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-        }
+    try {
+      await videoRef.current.play();
+      setAutoplayBlocked(false);
+    } catch (error) {
+      console.warn("VideoTile: manual play failed", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!callObject || !participant) {
+      return;
+    }
+
+    const attemptPlayback = async () => {
+      if (!videoRef.current) {
+        return;
       }
+
+      try {
+        videoRef.current.defaultMuted = true;
+        videoRef.current.muted = true;
+        videoRef.current.autoplay = true;
+        videoRef.current.playsInline = true;
+        videoRef.current.setAttribute("muted", "muted");
+        videoRef.current.setAttribute("playsinline", "true");
+
+        await videoRef.current.play();
+        setAutoplayBlocked(false);
+      } catch {
+        console.warn("VideoTile: Autoplay blocked for", participant.user_name);
+        setAutoplayBlocked(true);
+      }
+    };
+
+    const cleanupStream = () => {
+      lastTrackIdRef.current = null;
+      streamRef.current = null;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+
+      setAutoplayBlocked(false);
+    };
+
+    const getParticipantSnapshot = () => {
+      if (!callObject) {
+        return participant;
+      }
+
+      const participants = callObject.participants() ?? {};
+      const latest = participants[participant.session_id];
+      return latest ?? participant;
+    };
+
+    const attachTrackToElement = (track: MediaStreamTrack | null, stream?: MediaStream | null) => {
+      if (!track) {
+        cleanupStream();
+        setHasVideo(false);
+        return false;
+      }
+
+      const resolvedStream = stream ?? new MediaStream([track]);
+      streamRef.current = resolvedStream;
+      lastTrackIdRef.current = track.id;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = resolvedStream;
+        void attemptPlayback();
+      }
+
+      setHasVideo(true);
+      return true;
+    };
+
+    const updateVideoTrack = () => {
+      const latestParticipant = getParticipantSnapshot();
+      const videoState = latestParticipant.tracks?.video?.state;
+      const videoTrack =
+        latestParticipant.tracks?.video?.track ??
+        (latestParticipant.tracks?.video as { persistentTrack?: MediaStreamTrack })?.persistentTrack ??
+        null;
+
+      // Only reject if track is explicitly ended or off, or doesn't exist
+      const shouldSkip = !videoTrack || 
+                        videoTrack.readyState === "ended" || 
+                        videoState === "off" ||
+                        videoState === "blocked";
+
+      if (shouldSkip) {
+        cleanupStream();
+        setHasVideo(false);
+        return;
+      }
+
+      if (lastTrackIdRef.current === videoTrack.id && videoRef.current?.srcObject) {
+        setHasVideo(true);
+        return;
+      }
+
+      attachTrackToElement(videoTrack);
     };
 
     // Initial update
     updateVideoTrack();
 
-    // Listen for track changes
-    const handleTrackStarted = (event: DailyEventObjectTrack) => {
-      if (event.participant?.session_id === participant.session_id && event.track?.kind === "video") {
-        console.log("VideoTile: Track started for", participant.user_name);
+    const handleRelevantChange = (sessionId?: string) => {
+      if (sessionId === participant.session_id) {
         updateVideoTrack();
       }
     };
 
+    const handleTrackStarted = (event: DailyEventObjectTrack) => {
+      if (event.track?.kind !== "video") {
+        return;
+      }
+
+      const participantId = event.participant?.session_id;
+      if (participantId === participant.session_id) {
+        const incomingTrack = event.track ?? null;
+        const incomingStream = event.stream ?? (incomingTrack ? new MediaStream([incomingTrack]) : null);
+
+        if (!attachTrackToElement(incomingTrack, incomingStream ?? undefined)) {
+          handleRelevantChange(participantId);
+        }
+      } else {
+        handleRelevantChange(participantId);
+      }
+    };
+
     const handleTrackStopped = (event: DailyEventObjectTrack) => {
-      if (event.participant?.session_id === participant.session_id && event.track?.kind === "video") {
-        console.log("VideoTile: Track stopped for", participant.user_name);
+      if (event.track?.kind === "video" && event.participant?.session_id === participant.session_id) {
+        cleanupStream();
+        setHasVideo(false);
+      }
+    };
+
+    const handleParticipantUpdated = (event: DailyEventObjectParticipant) => {
+      handleRelevantChange(event.participant?.session_id);
+    };
+
+    const handleParticipantLeft = (event: DailyEventObjectParticipant) => {
+      if (event.participant?.session_id === participant.session_id) {
+        cleanupStream();
         setHasVideo(false);
       }
     };
 
     callObject.on("track-started", handleTrackStarted);
     callObject.on("track-stopped", handleTrackStopped);
+    callObject.on("participant-updated", handleParticipantUpdated);
+    callObject.on("participant-left", handleParticipantLeft);
 
-    // Cleanup
     return () => {
       callObject.off("track-started", handleTrackStarted);
       callObject.off("track-stopped", handleTrackStopped);
-      
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      }
+      callObject.off("participant-updated", handleParticipantUpdated);
+      callObject.off("participant-left", handleParticipantLeft);
+
+      cleanupStream();
+      setHasVideo(false);
     };
   }, [participant, callObject]);
 
   return (
     <div className="relative bg-gray-800 rounded-lg overflow-hidden aspect-[4/3]">
       {hasVideo ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="w-full h-full object-cover"
-        />
+        <div className="relative h-full w-full">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full h-full object-cover"
+          />
+          {autoplayBlocked && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+              <Button
+                variant="outline"
+                className="bg-white/10 border-white/40 text-white hover:bg-white/20"
+                onClick={handleManualPlay}
+              >
+                Resume Video
+              </Button>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="w-full h-full flex items-center justify-center">
           <VideoOff className="w-12 h-12 text-gray-600" />
@@ -126,6 +247,34 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
     let isMounted = true;
     let activeCall: DailyCall | null = null;
 
+    const ensureSubscriptions = async (daily: DailyCall, participantsToCheck: DailyParticipant[]) => {
+      const trackUpdates: Record<string, { video: { subscribed: boolean; layer?: number } }> = {};
+
+      participantsToCheck.forEach((participant) => {
+        const videoTrackState = participant.tracks?.video;
+        const subscribedState = videoTrackState?.subscribed;
+        const isSubscribed = subscribedState === true;
+
+        if (!participant.local && videoTrackState && !isSubscribed) {
+          trackUpdates[participant.session_id] = {
+            video: {
+              subscribed: true,
+              layer: 0,
+            },
+          };
+        }
+      });
+
+      if (Object.keys(trackUpdates).length > 0) {
+        try {
+          await daily.updateReceiveSettings({ tracks: trackUpdates });
+          console.log("Wall: Forced subscription for", Object.keys(trackUpdates).length, "participant(s)");
+        } catch (subscriptionError) {
+          console.error("Wall: Failed to enforce subscriptions", subscriptionError);
+        }
+      }
+    };
+
     const updateParticipants = () => {
       if (!isMounted || !activeCall) {
         return;
@@ -133,13 +282,16 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
 
       const participantsList = Object.values(activeCall.participants())
         .filter((participant) => {
-          // Exclude local participant (the wall itself) and ensure video track exists
-          return !participant.local && participant.tracks?.video;
+          // Exclude local participant (the wall itself)
+          // We show all remote participants, even if video isn't ready yet
+          return !participant.local;
         })
         .sort((a, b) => (a.user_name || "").localeCompare(b.user_name || ""));
 
       console.log("Wall: Participants updated:", participantsList.length);
       setParticipants(participantsList);
+
+      void ensureSubscriptions(activeCall, participantsList);
     };
 
     const handleJoinedMeeting = () => {
@@ -240,6 +392,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
         await daily.updateReceiveSettings({
           base: {
             video: {
+              subscribed: true,
               layer: 0, // Request lowest quality layer for bandwidth
             },
           },

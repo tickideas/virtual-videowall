@@ -168,8 +168,10 @@ export async function POST(request: NextRequest) {
 - [ ] Page counter shows correct values
 - [ ] Fullscreen mode toggles
 - [ ] Church names display on tiles
+- [ ] Church video displays in tiles when churches connect
 - [ ] Connection status indicators work
 - [ ] Empty state shows when no churches
+- [ ] "Resume Video" button appears if autoplay blocked
 
 **Admin Portal**:
 - [ ] Login with valid credentials works
@@ -236,6 +238,7 @@ A pull request is reviewable when it includes:
 - Use `lib/daily.ts` helpers for room management
 - Use `lib/utils.ts` for shared utilities
 - Use `useRef` to prevent duplicate Daily instances
+- Set up Daily.co event listeners in useEffect without blocking on ref availability
 - Test on both desktop and mobile
 - Check bandwidth usage for church interface changes
 - Update documentation when changing user-facing behavior
@@ -278,6 +281,16 @@ NEXT_PUBLIC_DAILY_DOMAIN=<your-domain.daily.co>  # Client-side
 ### 5. Prisma Client Out of Sync
 **Symptom**: TypeScript errors about missing model fields
 **Fix**: Run `npm run db:generate` after schema changes
+
+### 6. Video Wall Not Displaying Church Video
+**Symptom**: Churches connect successfully but video tiles show "no video" icon on wall
+**Root Cause**: React `useRef` timing issue - `videoRef.current` is `null` when `useEffect` first runs, causing early bailout before event listeners are attached
+**Fix**: Remove `videoRef.current` check from useEffect guard clause. Only check for `callObject` and `participant`. All internal functions (like `attachTrackToElement`) already safely check for ref availability when needed.
+**Prevention**: When working with Daily.co tracks in React:
+  - Never block useEffect execution based on ref availability
+  - Always set up event listeners even if DOM elements aren't ready yet
+  - Use defensive checks inside functions that actually manipulate DOM elements
+  - Test with actual church connections, not just local preview
 
 ## Quick Reference
 
