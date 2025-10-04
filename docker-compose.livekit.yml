@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   livekit:
-    image: livekit/livekit-server:latest
+    image: livekit/livekit-server:v1.5
     command: >
       sh -c '
       cat > /livekit.yaml << EOF
@@ -30,27 +30,27 @@ services:
       video:
         simulcast_layers:
           - quality: low
-              width: 240
-              height: 180
-              bitrate: 250000
-              framerate: 8
-            - quality: medium
-              width: 320
-              height: 240
-              bitrate: 350000
-              framerate: 10
+            width: 240
+            height: 180
+            bitrate: 250000
+            framerate: 8
+          - quality: medium
+            width: 320
+            height: 240
+            bitrate: 350000
+            framerate: 10
 
       audio:
         enabled: false
 
       logging:
-        level: debug
+        level: info
         json: true
 
       turn:
         enabled: false
       EOF
-      livekit-server --config /livekit.yaml --debug
+      livekit-server --config /livekit.yaml
       '
     ports:
       - "7880:7880"
