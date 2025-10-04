@@ -14,13 +14,14 @@ interface ChurchRoomProps {
   onLeave: () => void;
 }
 
-function RoomControls({ churchName, serviceName, onLeave }: {
+function RoomControls({ churchName, serviceName, roomName, onLeave }: {
   churchName: string;
   serviceName: string;
+  roomName: string;
   onLeave: () => void;
 }) {
-  const { isCameraEnabled, microphoneTrack } = useLocalParticipant();
-  const [connectionQuality, setConnectionQuality] = useState<"excellent" | "good" | "poor">("good");
+  const { isCameraEnabled, localParticipant } = useLocalParticipant();
+  const connectionQuality = localParticipant?.connectionQuality ?? "good";
 
   return (
     <div className="fixed top-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm z-50">
@@ -29,6 +30,7 @@ function RoomControls({ churchName, serviceName, onLeave }: {
           <div>
             <h2 className="text-white font-semibold text-lg">{churchName}</h2>
             <p className="text-gray-300 text-sm">{serviceName}</p>
+            <p className="text-gray-400 text-xs">Room ID: {roomName}</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -96,7 +98,7 @@ export function ChurchRoom({ token, roomName, churchName, serviceName, onLeave }
         }}
         onDisconnected={onLeave}
       >
-        <RoomControls churchName={churchName} serviceName={serviceName} onLeave={onLeave} />
+        <RoomControls churchName={churchName} serviceName={serviceName} roomName={roomName} onLeave={onLeave} />
         <LocalVideo />
       </LiveKitRoom>
     </div>
@@ -128,7 +130,7 @@ function LocalVideo() {
     console.log('Church: Camera enabled:', isCameraEnabled);
     console.log('Church: Camera track:', !!cameraTrack);
     console.log('Church: Local participant:', localParticipant?.identity);
-    console.log('Church: Video tracks:', localParticipant?.videoTracks?.size || 0);
+    console.log('Church: Video tracks:', localParticipant?.videoTrackPublications?.size || 0);
   }, [cameraTrack, localParticipant, isCameraEnabled]);
 
   useEffect(() => {
@@ -172,5 +174,3 @@ function LocalVideo() {
     </div>
   );
 }
-
-

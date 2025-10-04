@@ -5,12 +5,12 @@ rtc:
   port_range_end: 50020
   use_external_ip: false
   tcp_port: 7881
-  node_ip: 172.19.2.171
+  node_ip: 127.0.0.1
   stun_servers:
     - stun.l.google.com:19302
 
 keys:
-  devkey: secret
+  LK41e534fcd2edbeb7: "34VbPa4AuiBsVvThn9mKUH+gJ3Ugs9FXPznSsI3ThXg="
 
 room:
   max_participants: 65

@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     let participantName = "Viewer";
     let participantIdentity = `viewer-${Date.now()}`;
     let canPublish = false;
-    let canSubscribe = true;
+    const canSubscribe = true;
 
     if (participantType === "church" && churchName) {
       // Find or create church by name
@@ -82,10 +82,6 @@ export async function POST(request: NextRequest) {
       canPublish,
       canSubscribe,
     });
-
-    console.log('Generated token type in API:', typeof token);
-    console.log('Generated token in API:', token?.substring?.(0, 20) + '...');
-    console.log('Token is string:', typeof token === 'string');
 
     return NextResponse.json({
       token: String(token),

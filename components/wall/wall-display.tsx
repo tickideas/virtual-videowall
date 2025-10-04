@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LiveKitRoom, useParticipants, useRoomInfo } from "@livekit/components-react";
+import { LiveKitRoom, useParticipants } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { ChevronLeft, ChevronRight, Maximize, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,13 @@ interface WallDisplayProps {
   sessionCode: string;
 }
 
-function WallGrid() {
+interface WallGridProps {
+  serviceName: string;
+  sessionCode: string;
+  roomName: string;
+}
+
+function WallGrid({ serviceName, sessionCode, roomName }: WallGridProps) {
   const allParticipants = useParticipants();
   const [currentPage, setCurrentPage] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -22,7 +28,7 @@ function WallGrid() {
   // Filter out viewers (wall displays) and participants without video tracks
   const participants = allParticipants.filter(p => {
     const isViewer = p.identity.startsWith('viewer-');
-    const hasVideo = p.videoTracks && p.videoTracks.size > 0;
+    const hasVideo = p.videoTrackPublications.size > 0;
     return !isViewer && hasVideo;
   });
   
@@ -33,7 +39,7 @@ function WallGrid() {
     console.log('Wall: Participants:', participants.map(p => ({
       identity: p.identity,
       name: p.name,
-      videoTracks: p.videoTracks?.size || 0,
+      videoTracks: p.videoTrackPublications.size,
     })));
   }, [allParticipants, participants]);
   
@@ -69,16 +75,19 @@ function WallGrid() {
     <div className="h-screen w-screen bg-gray-900 flex flex-col">
       <div className="flex-none bg-gray-800/50 backdrop-blur-sm px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-white">
+          <div className="flex flex-col gap-1 text-white">
+            <div className="flex items-center gap-2">
               <Users className="w-5 h-5" />
               <span className="font-medium">{participants.length} Churches Connected</span>
             </div>
-            {totalPages > 1 && (
-              <div className="text-gray-400 text-sm">
-                Page {currentPage + 1} of {totalPages}
-              </div>
-            )}
+            <div className="text-sm text-gray-300">{serviceName}</div>
+            <div className="flex flex-wrap gap-4 text-xs text-gray-400">
+              <span>Session: {sessionCode}</span>
+              <span>Room: {roomName}</span>
+              {totalPages > 1 && (
+                <span>Page {currentPage + 1} of {totalPages}</span>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -160,7 +169,7 @@ export function WallDisplay({ token, roomName, serviceName, sessionCode }: WallD
         dynacast: true,
       }}
     >
-      <WallGrid />
+      <WallGrid serviceName={serviceName} sessionCode={sessionCode} roomName={roomName} />
     </LiveKitRoom>
   );
 }

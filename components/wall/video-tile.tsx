@@ -1,7 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Participant, Track } from "livekit-client";
+import { useState, useEffect, useCallback } from "react";
+import {
+  Participant,
+  ParticipantEvent,
+  Track,
+  type RemoteTrackPublication,
+} from "livekit-client";
 import { Video, VideoOff, Wifi, WifiOff } from "lucide-react";
 
 interface VideoTileProps {
@@ -9,59 +14,132 @@ interface VideoTileProps {
 }
 
 export function VideoTile({ participant }: VideoTileProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
   const [hasVideo, setHasVideo] = useState(false);
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
+
+  const handleVideoRef = useCallback((node: HTMLVideoElement | null) => {
+    setVideoElement(node);
+  }, []);
 
   useEffect(() => {
-    const videoElement = videoRef.current;
-    if (!videoElement) return;
+    if (!videoElement) {
+      return;
+    }
 
-    const attachVideo = () => {
-      try {
-        if (participant?.videoTracks) {
-          const tracks = Array.from(participant.videoTracks.values());
-          const videoPublication = tracks.find(pub => pub.source === Track.Source.Camera) || tracks[0];
-          
-          if (videoPublication && videoPublication.track) {
-            videoPublication.track.attach(videoElement);
-            setHasVideo(true);
-            return () => {
-              videoPublication.track?.detach(videoElement);
-            };
-          }
+    let detachCurrentTrack: (() => void) | undefined;
+
+    const selectVideoPublication = () => {
+      if (!participant?.videoTrackPublications) {
+        return undefined;
+      }
+
+      const publications = Array.from(participant.videoTrackPublications.values());
+      if (publications.length === 0) {
+        return undefined;
+      }
+
+      const cameraPublication = participant.getTrackPublication(Track.Source.Camera);
+      if (cameraPublication && cameraPublication.kind === Track.Kind.Video) {
+        return cameraPublication;
+      }
+
+      return publications.find(pub => pub.kind === Track.Kind.Video) || publications[0];
+    };
+
+    const subscribeIfNeeded = (publication?: RemoteTrackPublication) => {
+      if (!publication) {
+        return;
+      }
+
+      if ("setSubscribed" in publication && !publication.isSubscribed) {
+        try {
+          publication.setSubscribed(true);
+        } catch (error) {
+          console.error("Error subscribing to track:", error);
         }
-        setHasVideo(false);
-      } catch (e) {
-        console.error('Error attaching video:', e);
+      }
+    };
+
+    const updateVideo = () => {
+      detachCurrentTrack?.();
+      detachCurrentTrack = undefined;
+
+      try {
+        const publication = selectVideoPublication();
+        subscribeIfNeeded(publication as RemoteTrackPublication | undefined);
+
+        const track = publication?.videoTrack;
+
+        if (!track) {
+          setHasVideo(false);
+          return;
+        }
+
+        track.attach(videoElement);
+        videoElement.play?.().catch(() => {
+          /* autoplay guard */
+        });
+        detachCurrentTrack = () => {
+          track.detach(videoElement);
+        };
+        setHasVideo(true);
+      } catch (error) {
+        console.error("Error attaching video:", error);
         setHasVideo(false);
       }
     };
 
-    const cleanup = attachVideo();
-    
-    // Listen for track updates
-    participant.on('trackSubscribed', attachVideo);
-    participant.on('trackUnsubscribed', () => setHasVideo(false));
+    const handleTrackSubscribed = () => updateVideo();
+
+    const handleTrackPublished = (publication: RemoteTrackPublication) => {
+      subscribeIfNeeded(publication);
+      updateVideo();
+    };
+
+    const handleTrackUnsubscribed = () => {
+      detachCurrentTrack?.();
+      detachCurrentTrack = undefined;
+      setHasVideo(false);
+    };
+
+    const handleTrackMuted = () => {
+      setHasVideo(false);
+    };
+
+    const handleTrackUnmuted = () => {
+      updateVideo();
+    };
+
+    updateVideo();
+
+    participant.on(ParticipantEvent.TrackSubscribed, handleTrackSubscribed);
+    participant.on(ParticipantEvent.TrackPublished, handleTrackPublished);
+    participant.on(ParticipantEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+    participant.on(ParticipantEvent.TrackMuted, handleTrackMuted);
+    participant.on(ParticipantEvent.TrackUnmuted, handleTrackUnmuted);
 
     return () => {
-      cleanup?.();
-      participant.off('trackSubscribed', attachVideo);
-      participant.off('trackUnsubscribed', () => setHasVideo(false));
+      detachCurrentTrack?.();
+      participant.off(ParticipantEvent.TrackSubscribed, handleTrackSubscribed);
+      participant.off(ParticipantEvent.TrackPublished, handleTrackPublished);
+      participant.off(ParticipantEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+      participant.off(ParticipantEvent.TrackMuted, handleTrackMuted);
+      participant.off(ParticipantEvent.TrackUnmuted, handleTrackUnmuted);
     };
-  }, [participant]);
+  }, [participant, videoElement]);
 
   return (
     <div className="relative bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-gray-600 transition-colors aspect-video">
-      {hasVideo ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="w-full h-full object-cover"
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gray-800">
+      <video
+        ref={handleVideoRef}
+        autoPlay
+        playsInline
+        muted
+        className={`w-full h-full object-cover transition-opacity duration-200 ${hasVideo ? "opacity-100" : "opacity-0"}`}
+      />
+
+      {!hasVideo && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
           <VideoOff className="w-12 h-12 text-gray-600" />
         </div>
       )}

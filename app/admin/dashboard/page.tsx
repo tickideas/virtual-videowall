@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Calendar, Church, Activity, Plus, Video, LogOut } from "lucide-react";
+import { Calendar, Church, Activity, Plus, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [stats, setStats] = useState({
+  const [stats] = useState({
     totalChurches: 0,
     activeServices: 0,
     totalSessions: 0,

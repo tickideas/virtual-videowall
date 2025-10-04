@@ -1,10 +1,14 @@
 import { AccessToken } from "livekit-server-sdk";
 
-const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
-const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
+function getLiveKitCredentials() {
+  const apiKey = process.env.LIVEKIT_API_KEY;
+  const apiSecret = process.env.LIVEKIT_API_SECRET;
 
-if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
-  throw new Error("LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be set");
+  if (!apiKey || !apiSecret) {
+    throw new Error("LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be set");
+  }
+
+  return { apiKey, apiSecret };
 }
 
 export interface CreateTokenOptions {
@@ -22,7 +26,9 @@ export async function createLiveKitToken({
   canPublish = true,
   canSubscribe = true,
 }: CreateTokenOptions): Promise<string> {
-  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+  const { apiKey, apiSecret } = getLiveKitCredentials();
+
+  const at = new AccessToken(apiKey, apiSecret, {
     identity: participantIdentity,
     name: participantName,
   });
@@ -35,7 +41,6 @@ export async function createLiveKitToken({
   });
 
   const token = await at.toJwt();
-  console.log('Token generated in lib:', typeof token, token);
   return token;
 }
 
