@@ -9,24 +9,19 @@ services:
       port: 7880
       bind_addresses:
         - ""
-
       rtc:
         port_range_start: 51000
         port_range_end: 51100
         use_external_ip: true
         tcp_port: 7881
-        node_ip: 127.0.0.1
         stun_servers:
           - stun.l.google.com:19302
-
       keys:
-        LK41e534fcd2edbeb7: "34VbPa4AuiBsVvThn9mKUH+gJ3Ugs9FXPznSsI3ThXg="
-
+        $${LIVEKIT_API_KEY}: "$${LIVEKIT_API_SECRET}"
       room:
         max_participants: 65
         empty_timeout: 300
         auto_create: true
-
       video:
         simulcast_layers:
           - quality: low
@@ -39,19 +34,19 @@ services:
             height: 240
             bitrate: 350000
             framerate: 10
-
       audio:
         enabled: false
-
       logging:
         level: info
         json: true
-
       turn:
         enabled: false
       EOF
       livekit-server --config /livekit.yaml
       '
+    environment:
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-LK41e534fcd2edbeb7}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-34VbPa4AuiBsVvThn9mKUH+gJ3Ugs9FXPznSsI3ThXg=}
     ports:
       - "7880:7880"
       - "7881:7881"
