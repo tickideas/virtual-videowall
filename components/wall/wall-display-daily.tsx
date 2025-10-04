@@ -194,7 +194,7 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
   }, [participant, callObject]);
 
   return (
-    <div className="relative bg-gray-800 rounded-lg overflow-hidden aspect-[4/3]">
+    <div className="relative bg-gray-800 rounded-lg overflow-hidden aspect-video">
       {hasVideo ? (
         <div className="relative h-full w-full">
           <video
@@ -533,7 +533,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
             </div>
           </div>
         ) : (
-          <div className="h-full grid grid-cols-4 grid-rows-5 gap-3">
+          <div className="h-full grid grid-cols-5 grid-rows-4 gap-2 lg:gap-3">
             {currentParticipants.map((participant) => (
               <VideoTile
                 key={participant.session_id}

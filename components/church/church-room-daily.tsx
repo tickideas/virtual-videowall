@@ -326,34 +326,56 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       </div>
 
       {/* Video Display */}
-      <div className="flex items-center justify-center h-full pt-20 sm:pt-24 pb-4 sm:pb-8 px-2 sm:px-4">
-        <div className="w-full max-w-2xl">
-          <div className="rounded-lg sm:rounded-xl overflow-hidden shadow-2xl bg-gray-900">
-            {isCameraEnabled ? (
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-auto object-cover"
-                style={{ maxHeight: '40vh' }}
-              />
-            ) : (
-              <div className="aspect-video flex items-center justify-center" style={{ minHeight: '200px' }}>
-                <VideoOff className="w-8 h-8 sm:w-16 sm:h-16 text-gray-600" />
+      <div className="h-full flex flex-col pt-20 sm:pt-24 pb-4 sm:pb-8 px-2 sm:px-4">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-full max-w-4xl">
+            <div className="rounded-lg sm:rounded-xl overflow-hidden shadow-2xl bg-gray-900 aspect-video">
+              {isCameraEnabled ? (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <VideoOff className="w-8 h-8 sm:w-16 sm:h-16 text-gray-600" />
+                </div>
+              )}
+            </div>
+            
+            {/* Landscape Mode Notice */}
+            <div className="mt-4 sm:mt-6 bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-blue-900 mb-1">
+                    📱 Best Practice: Use Landscape Mode
+                  </p>
+                  <p className="text-xs text-blue-700 leading-relaxed">
+                    For optimal video quality on the wall, please place your phone in <strong>landscape (horizontal) mode</strong> on a stand. 
+                    This ensures your video fills the 16:9 display properly and provides the best viewing experience for other churches.
+                  </p>
+                </div>
               </div>
-            )}
-          </div>
-          <div className="mt-4 sm:mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-white text-center">
-            <p className="text-sm sm:text-lg font-medium mb-2">
-              {isJoined ? "You are now live on the video wall!" : "Connecting..."}
-            </p>
-            <p className="text-xs sm:text-sm text-gray-300">
-              Your video is being streamed at low quality (240p @ 8fps) to conserve bandwidth.
-            </p>
-            <p className="text-xs sm:text-sm text-gray-300 mt-2">
-              Audio is muted by default to prevent feedback.
-            </p>
+            </div>
+            
+            <div className="mt-4 sm:mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-white text-center">
+              <p className="text-sm sm:text-lg font-medium mb-2">
+                {isJoined ? "You are now live on the video wall!" : "Connecting..."}
+              </p>
+              <p className="text-xs sm:text-sm text-gray-300">
+                Your video is being streamed at low quality (240p @ 8fps) to conserve bandwidth.
+              </p>
+              <p className="text-xs sm:text-sm text-gray-300 mt-2">
+                Audio is muted by default to prevent feedback.
+              </p>
+            </div>
           </div>
         </div>
       </div>

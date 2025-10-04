@@ -77,16 +77,16 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
   };
 
   return (
-    <div className="max-w-md mx-auto px-3">
-      <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-8">
-        <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-100 mx-auto mb-4 sm:mb-6">
-          <Video className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
+    <div className="max-w-md mx-auto px-4 py-8">
+      <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mx-auto mb-6">
+          <Video className="w-8 h-8 text-blue-600" />
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-bold text-center text-gray-900 mb-2">
+        <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">
           Join the Zonal Videowall
         </h1>
-        <p className="text-center text-gray-600 mb-6 sm:mb-8 text-sm sm:text-base">
+        <p className="text-center text-gray-600 mb-8">
           Enter your codes to connect to the service
         </p>
 
