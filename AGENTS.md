@@ -37,7 +37,7 @@ Database must be running before executing any `db:*` commands. Use `docker-compo
 │  └─ auth.ts              → Authentication helpers
 ├─ prisma/                  → Database schema & seeds
 │  ├─ schema.prisma        → Database models
-│  └─ seed.ts              → Initial data seeder
+│  └─ seed.mjs             → Initial data seeder
 ├─ scripts/                 → Setup and utility scripts
 └─ public/                  → Static assets
 ```
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
 
 1. Update `prisma/schema.prisma`
 2. Run `npm run db:push` (dev) or create migration (production)
-3. Update `seed.ts` if needed
+3. Update `seed.mjs` if needed
 4. Regenerate client: `npm run db:generate`
 5. Test queries in Prisma Studio: `npm run db:studio`
 
@@ -303,7 +303,7 @@ NEXT_PUBLIC_DAILY_DOMAIN=<your-domain.daily.co>  # Client-side
 1. Update `prisma/schema.prisma`
 2. Add indexes on foreign keys and commonly queried fields
 3. Run `npm run db:push`
-4. Update `seed.ts` if default data needed
+4. Update `seed.mjs` if default data needed
 5. Test with `npm run db:studio`
 
 ## Support Resources

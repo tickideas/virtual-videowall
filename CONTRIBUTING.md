@@ -65,7 +65,7 @@ Visit http://localhost:3000
 
 /prisma                # Database
   schema.prisma       # Database schema
-  seed.ts             # Seed script
+  seed.mjs            # Seed script
 
 /public                # Static assets
 ```
