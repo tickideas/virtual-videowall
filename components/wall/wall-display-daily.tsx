@@ -149,7 +149,7 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
       const participantId = event.participant?.session_id;
       if (participantId === participant.session_id) {
         const incomingTrack = event.track ?? null;
-        const incomingStream = event.stream ?? (incomingTrack ? new MediaStream([incomingTrack]) : null);
+        const incomingStream = incomingTrack ? new MediaStream([incomingTrack]) : null;
 
         if (!attachTrackToElement(incomingTrack, incomingStream ?? undefined)) {
           handleRelevantChange(participantId);
@@ -170,7 +170,7 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
       handleRelevantChange(event.participant?.session_id);
     };
 
-    const handleParticipantLeft = (event: DailyEventObjectParticipant) => {
+    const handleParticipantLeft = (event: { action: string; participant?: DailyParticipant }) => {
       if (event.participant?.session_id === participant.session_id) {
         cleanupStream();
         setHasVideo(false);
@@ -267,6 +267,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
 
       if (Object.keys(trackUpdates).length > 0) {
         try {
+          // @ts-expect-error - Daily.js types are not up to date
           await daily.updateReceiveSettings({ tracks: trackUpdates });
           console.log("Wall: Forced subscription for", Object.keys(trackUpdates).length, "participant(s)");
         } catch (subscriptionError) {
@@ -392,6 +393,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
         await daily.updateReceiveSettings({
           base: {
             video: {
+              // @ts-expect-error - Daily.js types are not up to date
               subscribed: true,
               layer: 0, // Request lowest quality layer for bandwidth
             },

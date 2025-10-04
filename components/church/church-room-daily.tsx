@@ -160,9 +160,8 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
           return;
         }
 
-        // Disable video processors to reduce CPU load when supported
-        const supportsProcessors = DailyIframe.supportedBrowser?.().supportsInputMediaProcessors ?? false;
-        if (supportsProcessors) {
+        // Disable video processors to reduce CPU load
+        try {
           await daily.updateInputSettings({
             video: {
               processor: {
@@ -170,8 +169,8 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
               },
             },
           });
-        } else {
-          console.log("Church: Skipping video processor settings (not supported in this browser)");
+        } catch (error) {
+          console.log("Church: Skipping video processor settings (not supported in this browser)", error);
         }
 
         // Ensure video is on and audio is off
