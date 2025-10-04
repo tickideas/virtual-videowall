@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createLiveKitToken } from "@/lib/livekit";
+import { createOrGetDailyRoom, createDailyToken, getDailyRoomUrl } from "@/lib/daily";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
@@ -24,6 +24,10 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    // Create or get Daily.co room for this service
+    const roomName = service.id;
+    await createOrGetDailyRoom({ roomName, maxParticipants: 65 });
 
     let participantName = "Viewer";
     let participantIdentity = `viewer-${Date.now()}`;
@@ -75,22 +79,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const token = await createLiveKitToken({
-      roomName: service.id,
+    // Create Daily.co token
+    const token = await createDailyToken({
+      roomName,
       participantName,
       participantIdentity,
       canPublish,
       canSubscribe,
     });
 
+    const roomUrl = getDailyRoomUrl(roomName);
+
     return NextResponse.json({
       token: String(token),
-      roomName: service.id,
+      roomName,
+      roomUrl,
       serviceName: service.name,
-      livekitUrl: process.env.LIVEKIT_URL,
     });
   } catch (error) {
-    console.error("Error generating LiveKit token:", error);
+    console.error("Error generating Daily.co token:", error);
     return NextResponse.json(
       { error: "Failed to generate token" },
       { status: 500 }
