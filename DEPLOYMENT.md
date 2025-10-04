@@ -67,7 +67,7 @@ version: '3.9'
 
 services:
   livekit:
-    image: livekit/livekit-server:v1.5
+    image: livekit/livekit-server:latest
     command: --config /livekit.yaml
     volumes:
       - ./livekit.yaml:/livekit.yaml:ro
