@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   livekit:
-    image: livekit/livekit-server:lastest
+    image: livekit/livekit-server:latest
     command: >
       sh -c '
       cat > /livekit.yaml << EOF
