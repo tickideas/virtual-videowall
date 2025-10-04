@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Church {
+  id        String    @id @default(cuid())
+  name      String
+  code      String    @unique
+  location  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  sessions  Session[]
+
+  @@index([code])
+}
+
+model Service {
+  id          String    @id @default(cuid())
+  name        String
+  sessionCode String    @unique
+  startTime   DateTime
+  endTime     DateTime?
+  active      Boolean   @default(false)
+  maxChurches Int       @default(60)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  sessions    Session[]
+
+  @@index([sessionCode])
+  @@index([active])
+}
+
+model Session {
+  id                String    @id @default(cuid())
+  churchId          String
+  serviceId         String
+  church            Church    @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  service           Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  joinedAt          DateTime  @default(now())
+  leftAt            DateTime?
+  isActive          Boolean   @default(true)
+  avgBandwidth      Int?
+  connectionQuality String?
+
+  @@index([serviceId, isActive])
+  @@index([churchId])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
