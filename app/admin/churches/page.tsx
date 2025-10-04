@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Church, Plus, ArrowLeft, Loader2 } from "lucide-react";
+import { Church, Plus, ArrowLeft, Loader2, Trash2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 interface Church {
@@ -23,6 +23,8 @@ export default function ChurchesPage() {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ name: "", location: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [churchToDelete, setChurchToDelete] = useState<Church | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchChurches = async () => {
     try {
@@ -60,6 +62,30 @@ export default function ChurchesPage() {
       console.error("Error creating church:", error);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!churchToDelete) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/admin/churches?id=${churchToDelete.id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setChurchToDelete(null);
+        fetchChurches();
+      } else {
+        const data = await response.json();
+        alert(data.error || "Failed to delete church");
+      }
+    } catch (error) {
+      console.error("Error deleting church:", error);
+      alert("Failed to delete church");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -129,8 +155,9 @@ export default function ChurchesPage() {
             <p className="text-gray-500">Loading churches...</p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {churches.map((church) => (
+          <>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {churches.map((church) => (
               <div key={church.id} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
@@ -145,14 +172,83 @@ export default function ChurchesPage() {
                       <p className="text-xs text-gray-600 mb-1">Church Code</p>
                       <p className="text-lg font-mono font-bold text-gray-900">{church.code}</p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {church._count.sessions} session(s)
-                    </p>
+                    <div className="mt-3 flex items-center justify-between">
+                      <p className="text-xs text-gray-500">
+                        {church._count.sessions} session(s)
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setChurchToDelete(church)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                        disabled={church._count.sessions > 0}
+                        title={church._count.sessions > 0 ? "Cannot delete church with sessions" : "Delete church"}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+
+            {/* Delete Confirmation Modal */}
+            {churchToDelete && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">Delete Church</h3>
+                </div>
+                
+                <p className="text-gray-600 mb-6">
+                  Are you sure you want to delete <span className="font-semibold">{churchToDelete.name}</span>? 
+                  This action cannot be undone.
+                </p>
+
+                {churchToDelete._count.sessions > 0 && (
+                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      This church has {churchToDelete._count.sessions} session(s). 
+                      You cannot delete churches with existing sessions.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setChurchToDelete(null)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDelete}
+                    disabled={deleting || churchToDelete._count.sessions > 0}
+                    className="flex-1"
+                  >
+                    {deleting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>
