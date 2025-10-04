@@ -11,8 +11,8 @@ services:
         - ""
 
       rtc:
-        port_range_start: 50000
-        port_range_end: 60000
+        port_range_start: 51000
+        port_range_end: 51100
         use_external_ip: true
         tcp_port: 7881
         node_ip: 127.0.0.1
@@ -55,5 +55,5 @@ services:
     ports:
       - "7880:7880"
       - "7881:7881"
-      - "50000-60000:50000-60000/udp"
+      - "51000-51100:51000-51100/udp"
     restart: unless-stopped
