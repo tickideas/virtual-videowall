@@ -226,6 +226,8 @@ npx prisma db push
 npx prisma db seed
 ```
 
+> **Note:** If you previously saw `Could not find Prisma Schema` when running these commands, redeploy with the latest image. The runtime container now ships with the `/app/prisma` directory so `npx prisma ...` can locate `schema.prisma`. You can verify with `ls prisma` in the Coolify terminal before running the commands.
+
 **Option B: Via SSH to Coolify Server**
 ```bash
 # SSH to Coolify server
