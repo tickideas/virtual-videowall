@@ -118,15 +118,31 @@ Now reads from environment variables with fallback defaults.
 
 Make sure your main application service also has these variables:
 
+### For Standalone Services in Coolify (Recommended)
+
+When deploying as separate standalone services (not docker-compose network), both server and client should use the **same public URL**:
+
 ```bash
-# Server-side (internal Docker network)
-LIVEKIT_URL=ws://livekit:7880
+# Server-side (use PUBLIC URL for standalone services)
+LIVEKIT_URL=wss://livekit.yourdomain.com
 LIVEKIT_API_KEY=LK41e534fcd2edbeb7
 LIVEKIT_API_SECRET=34VbPa4AuiBsVvThn9mKUH+gJ3Ugs9FXPznSsI3ThXg=
 
-# Client-side (publicly accessible)
+# Client-side (must be publicly accessible)
 NEXT_PUBLIC_LIVEKIT_URL=wss://livekit.yourdomain.com
+
+# Database (use Coolify's PostgreSQL service hostname)
+DATABASE_URL=postgresql://user:password@postgres-service-name:5432/videowall?schema=public
+
+# NextAuth
+NEXTAUTH_URL=https://videowall.yourdomain.com
+NEXTAUTH_SECRET=<generate-unique>
 ```
+
+**Critical**: Both `LIVEKIT_URL` and `NEXT_PUBLIC_LIVEKIT_URL` must:
+- Use the **same URL** (wss://livekit.yourdomain.com)
+- Use `wss://` (secure WebSocket) for HTTPS sites
+- Be publicly accessible (not internal docker network names)
 
 ## Network Requirements
 
