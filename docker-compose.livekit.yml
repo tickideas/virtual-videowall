@@ -2,10 +2,56 @@ version: '3.9'
 
 services:
   livekit:
-    image: livekit/livekit-server:latest
-    command: --config /livekit.yaml
-    volumes:
-      - ./livekit.yaml:/livekit.yaml:ro
+    image: livekit/livekit-server:lastest
+    command: >
+      sh -c '
+      cat > /livekit.yaml << EOF
+      port: 7880
+      bind_addresses:
+        - ""
+
+      rtc:
+        port_range_start: 50000
+        port_range_end: 60000
+        use_external_ip: true
+        tcp_port: 7881
+        node_ip: 127.0.0.1
+        stun_servers:
+          - stun.l.google.com:19302
+
+      keys:
+        LK41e534fcd2edbeb7: "34VbPa4AuiBsVvThn9mKUH+gJ3Ugs9FXPznSsI3ThXg="
+
+      room:
+        max_participants: 65
+        empty_timeout: 300
+        auto_create: true
+
+      video:
+        simulcast_layers:
+          - quality: low
+              width: 240
+              height: 180
+              bitrate: 250000
+              framerate: 8
+            - quality: medium
+              width: 320
+              height: 240
+              bitrate: 350000
+              framerate: 10
+
+      audio:
+        enabled: false
+
+      logging:
+        level: debug
+        json: true
+
+      turn:
+        enabled: false
+      EOF
+      livekit-server --config /livekit.yaml --debug
+      '
     ports:
       - "7880:7880"
       - "7881:7881"
