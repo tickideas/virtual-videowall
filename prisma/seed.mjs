@@ -1,6 +1,7 @@
 // @ts-check
 import { PrismaClient } from "@prisma/client";
-import { hash } from "bcryptjs";
+import pkg from 'bcryptjs';
+const { hash } = pkg;
 
 const prisma = new PrismaClient();
 
