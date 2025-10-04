@@ -77,22 +77,22 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
   };
 
   return (
-    <div className="max-w-md mx-auto">
-      <div className="bg-white rounded-2xl shadow-xl p-8">
-        <div className="flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mx-auto mb-6">
-          <Video className="w-8 h-8 text-blue-600" />
+    <div className="max-w-md mx-auto px-3">
+      <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-8">
+        <div className="flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-100 mx-auto mb-4 sm:mb-6">
+          <Video className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
         </div>
 
-        <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-center text-gray-900 mb-2">
           Join the Zonal Videowall
         </h1>
-        <p className="text-center text-gray-600 mb-8">
+        <p className="text-center text-gray-600 mb-6 sm:mb-8 text-sm sm:text-base">
           Enter your codes to connect to the service
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="sessionCode">Service Code</Label>
+            <Label htmlFor="sessionCode" className="text-sm sm:text-base">Service Code</Label>
             <Input
               id="sessionCode"
               type="text"
@@ -103,7 +103,7 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
               }
               maxLength={6}
               required
-              className="text-center text-xl tracking-widest font-mono"
+              className="text-center text-lg sm:text-xl tracking-widest font-mono h-12 sm:h-auto"
             />
             <p className="text-xs text-gray-500">
               6-digit code provided by the admin
@@ -111,7 +111,7 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="churchName">Your Church Name</Label>
+            <Label htmlFor="churchName" className="text-sm sm:text-base">Your Church Name</Label>
             <Input
               id="churchName"
               type="text"
@@ -119,7 +119,7 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
               value={churchName}
               onChange={(e) => setChurchName(e.target.value)}
               required
-              className="text-base"
+              className="text-base h-12 sm:h-auto"
             />
             <p className="text-xs text-gray-500">
               This name will be displayed on the video wall
@@ -127,7 +127,7 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4">
               <p className="text-sm text-red-600">{error}</p>
             </div>
           )}
@@ -135,34 +135,21 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
           <Button
             type="submit"
             disabled={loading || sessionCode.length !== 6 || churchName.trim().length === 0}
-            className="w-full h-12 text-base"
+            className="w-full h-12 sm:h-auto text-sm sm:text-base py-3"
           >
             {loading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin mr-2" />
                 Joining...
               </>
             ) : (
               <>
-                <Video className="w-5 h-5" />
+                <Video className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                 Join Service
               </>
             )}
           </Button>
         </form>
-
-        <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-          <p className="text-sm text-blue-900 font-medium mb-2">
-            Quick Setup:
-          </p>
-          <ul className="text-xs text-blue-700 space-y-1">
-            <li>• Get the 6-digit service code from your admin</li>
-            <li>• Enter your church name exactly as you want it displayed</li>
-            <li>• Allow camera access when prompted</li>
-            <li>• Audio will be muted automatically</li>
-            <li>• Minimum 300 Kbps upload speed recommended</li>
-          </ul>
-        </div>
       </div>
     </div>
   );

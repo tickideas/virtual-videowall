@@ -217,16 +217,19 @@ Click **Deploy** and monitor build logs.
 
 After the application is running, you need to initialize the database:
 
-**Option A: Via Coolify Terminal**
+**Option A: Via Coolify Terminal (Recommended)**
 1. Go to your application in Coolify
 2. Open **Terminal**
-3. Run:
+3. Run the database commands:
 ```bash
+# Push the schema to create tables
 npx prisma db push
-npx prisma db seed
+
+# Seed the database (creates admin user)
+node prisma/seed.mjs
 ```
 
-> **Note:** If you previously saw `Could not find Prisma Schema` when running these commands, redeploy with the latest image. The runtime container now ships with the `/app/prisma` directory so `npx prisma ...` can locate `schema.prisma`. You can verify with `ls prisma` in the Coolify terminal before running the commands.
+> **Note:** Use `node prisma/seed.mjs` directly instead of `npx prisma db seed` because the production container uses Next.js standalone output which doesn't include all node_modules. The seed script only needs the Prisma client (which is included) and bcryptjs (which is bundled).
 
 **Option B: Via SSH to Coolify Server**
 ```bash
@@ -238,8 +241,18 @@ docker ps | grep videowall-app
 
 # Execute commands
 docker exec -it <container-id> npx prisma db push
-docker exec -it <container-id> npx prisma db seed
+docker exec -it <container-id> node prisma/seed.mjs
 ```
+
+**Option C: Seed from Local Machine (Before Deployment)**
+```bash
+# From your local machine with DATABASE_URL set
+export DATABASE_URL="postgresql://user:password@your-server:5432/videowall"
+npm run db:push
+npm run db:seed
+```
+
+> **Troubleshooting:** If you get `Cannot find package 'bcryptjs'` error, the container is using Next.js standalone mode which has minimal dependencies. Use `node prisma/seed.mjs` directly or seed from your local machine before deployment.
 
 ---
 
@@ -397,6 +410,37 @@ nc -u -zv livekit.yourdomain.com 51000
 - Try different network (mobile hotspot)
 - Ensure HTTPS (cameras require secure context)
 
+### Issue: "Cannot find package 'bcryptjs'" when seeding
+
+**Error message:**
+```
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'bcryptjs' imported from /app/prisma/seed.mjs
+```
+
+**Cause:**
+The production Docker image uses Next.js standalone build which includes minimal dependencies. The `bcryptjs` package is needed for seeding but may not be available in the container.
+
+**Fix:**
+1. **Use direct node command** instead of `npx prisma db seed`:
+   ```bash
+   # Instead of this:
+   npx prisma db seed
+   
+   # Use this:
+   node prisma/seed.mjs
+   ```
+
+2. **Or rebuild the Docker image** with the latest Dockerfile that includes bcryptjs:
+   - The updated Dockerfile copies necessary node_modules for seeding
+   - Redeploy the application in Coolify to get the new image
+
+3. **Or seed from local machine** before deployment:
+   ```bash
+   export DATABASE_URL="postgresql://user:password@your-server:5432/videowall"
+   npm run db:push
+   npm run db:seed
+   ```
+
 ---
 
 ## Part 6: Production Checklist
@@ -547,9 +591,9 @@ docker restart <container-name>
 # Check environment variables
 docker exec <container-name> env
 
-# Database migrations
+# Database migrations and seeding
 docker exec <app-container> npx prisma db push
-docker exec <app-container> npx prisma db seed
+docker exec <app-container> node prisma/seed.mjs  # Use node directly, not npx prisma db seed
 
 # Test connections
 curl https://livekit.yourdomain.com  # Should return: OK

@@ -34,10 +34,10 @@ export default function ChurchPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {!token ? (
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
           <Link
             href="/"
-            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-8"
+            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-6 sm:mb-8"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Home

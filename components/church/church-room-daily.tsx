@@ -276,71 +276,82 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
     <div className="h-screen w-screen bg-black">
       {/* Header Controls */}
       <div className="fixed top-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-white font-semibold text-lg">{churchName}</h2>
-              <p className="text-gray-300 text-sm">{serviceName}</p>
+        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-white font-semibold text-sm sm:text-lg truncate">{churchName}</h2>
+              <p className="text-gray-300 text-xs sm:text-sm truncate">{serviceName}</p>
             </div>
 
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10">
+            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+              <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10">
                 <Signal className={`w-4 h-4 ${getConnectionQualityColor()}`} />
                 <span className="text-sm text-white capitalize">
                   {connectionQuality === "very-low" ? "Poor" : connectionQuality}
                 </span>
               </div>
 
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/10">
+              <div className="flex items-center gap-2 px-2 py-2 rounded-lg bg-white/10">
                 {isCameraEnabled ? (
                   <Video className="w-4 h-4 text-green-400" />
                 ) : (
                   <VideoOff className="w-4 h-4 text-red-400" />
                 )}
-                <span className="text-sm text-white">
-                  {isCameraEnabled ? "Camera On" : "Camera Off"}
+                <span className="text-xs sm:text-sm text-white hidden xs:inline">
+                  {isCameraEnabled ? "On" : "Off"}
                 </span>
               </div>
 
               <Button
                 onClick={handleLeave}
                 variant="destructive"
-                size="lg"
+                size="sm"
+                className="text-xs sm:text-sm px-2 sm:px-4"
               >
-                <PhoneOff className="w-5 h-5" />
-                Leave Service
+                <PhoneOff className="w-4 h-4 sm:mr-1" />
+                <span className="hidden sm:inline">Leave Service</span>
+                <span className="sm:hidden">Leave</span>
               </Button>
             </div>
+          </div>
+          
+          {/* Mobile-only connection quality indicator */}
+          <div className="sm:hidden flex items-center gap-2 px-3 py-1 rounded-lg bg-white/10 mt-2 w-fit">
+            <Signal className={`w-3 h-3 ${getConnectionQualityColor()}`} />
+            <span className="text-xs text-white capitalize">
+              {connectionQuality === "very-low" ? "Poor" : connectionQuality}
+            </span>
           </div>
         </div>
       </div>
 
       {/* Video Display */}
-      <div className="flex items-center justify-center h-full pt-24 pb-8 px-4">
-        <div className="max-w-2xl w-full">
-          <div className="rounded-xl overflow-hidden shadow-2xl bg-gray-900">
+      <div className="flex items-center justify-center h-full pt-20 sm:pt-24 pb-4 sm:pb-8 px-2 sm:px-4">
+        <div className="w-full max-w-2xl">
+          <div className="rounded-lg sm:rounded-xl overflow-hidden shadow-2xl bg-gray-900">
             {isCameraEnabled ? (
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-auto"
+                className="w-full h-auto object-cover"
+                style={{ maxHeight: '40vh' }}
               />
             ) : (
-              <div className="aspect-video flex items-center justify-center">
-                <VideoOff className="w-16 h-16 text-gray-600" />
+              <div className="aspect-video flex items-center justify-center" style={{ minHeight: '200px' }}>
+                <VideoOff className="w-8 h-8 sm:w-16 sm:h-16 text-gray-600" />
               </div>
             )}
           </div>
-          <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-4 text-white text-center">
-            <p className="text-lg font-medium mb-2">
+          <div className="mt-4 sm:mt-6 bg-white/10 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-white text-center">
+            <p className="text-sm sm:text-lg font-medium mb-2">
               {isJoined ? "You are now live on the video wall!" : "Connecting..."}
             </p>
-            <p className="text-sm text-gray-300">
+            <p className="text-xs sm:text-sm text-gray-300">
               Your video is being streamed at low quality (240p @ 8fps) to conserve bandwidth.
             </p>
-            <p className="text-sm text-gray-300 mt-2">
+            <p className="text-xs sm:text-sm text-gray-300 mt-2">
               Audio is muted by default to prevent feedback.
             </p>
           </div>
