@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, memo, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import DailyIframe, { DailyCall, DailyParticipant, DailyEventObjectTrack, DailyEventObjectParticipant } from "@daily-co/daily-js";
 import { ChevronLeft, ChevronRight, Maximize, Users, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ interface VideoTileProps {
   callObject: DailyCall | null;
 }
 
-const VideoTile = memo(function VideoTile({ participant, callObject }: VideoTileProps) {
+function VideoTile({ participant, callObject }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasVideo, setHasVideo] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
@@ -340,17 +340,7 @@ const VideoTile = memo(function VideoTile({ participant, callObject }: VideoTile
       </div>
     </div>
   );
-}, (prevProps, nextProps) => {
-  // Be more lenient with re-renders to ensure video tracks appear
-  const prevTrack = prevProps.participant.tracks?.video;
-  const nextTrack = nextProps.participant.tracks?.video;
-  
-  return prevProps.participant.session_id === nextProps.participant.session_id &&
-         prevTrack?.state === nextTrack?.state &&
-         prevTrack?.subscribed === nextTrack?.subscribed &&
-         prevTrack?.track?.id === nextTrack?.track?.id &&
-         prevProps.callObject === nextProps.callObject;
-});
+}
 
 export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDisplayProps) {
   const callObjectRef = useRef<DailyCall | null>(null);
