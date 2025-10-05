@@ -219,18 +219,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
           return;
         }
 
-        // Disable video processors to reduce CPU load
-        try {
-          await daily.updateInputSettings({
-            video: {
-              processor: {
-                type: "none",
-              },
-            },
-          });
-        } catch (error) {
-          console.log("Church: Skipping video processor settings (not supported in this browser)", error);
-        }
+        // Note: Skipping video processor settings as they're not supported in all browsers
 
         // Ensure video is on and audio is off
         await daily.setLocalVideo(true);
@@ -467,12 +456,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
                   <p className="text-sm sm:text-lg font-medium mb-2">
                     {isJoined ? "You are now live on the video wall!" : "Connecting..."}
                   </p>
-                  <p className="text-xs sm:text-sm text-gray-300">
-                    Your video is being streamed at low quality (240p @ 8fps) to conserve bandwidth.
-                  </p>
-                  <p className="text-xs sm:text-sm text-gray-300 mt-2">
-                    Audio is muted by default to prevent feedback.
-                  </p>
+                 
                   <div className="flex items-center justify-center gap-2 mt-3">
                     <div className={`w-2 h-2 rounded-full ${
                       isJoined ? 'bg-green-400' : 'bg-yellow-400 animate-pulse'

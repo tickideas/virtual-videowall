@@ -156,7 +156,7 @@ export default function ChurchesPage() {
           </div>
         ) : (
           <>
-            <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {churches.map((church) => (
               <div key={church.id} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div className="flex items-start gap-4">

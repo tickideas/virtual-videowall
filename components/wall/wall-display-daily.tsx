@@ -650,7 +650,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
             </div>
           </div>
         ) : (
-          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 320px))', justifyContent: 'center' }}>
             {currentParticipants.map((participant) => (
               <VideoTile
                 key={participant.session_id}

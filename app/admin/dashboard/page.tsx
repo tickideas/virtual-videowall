@@ -173,17 +173,17 @@ export default function AdminDashboard() {
       </header>
 
       <main className="mx-auto w-full max-w-7xl px-4 sm:px-6 pb-12 pt-8">
-        <section className="grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4 xl:gap-6">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 xl:gap-6">
           {statCards.map(({ label, value, description, Icon, iconBg, iconColor }) => (
             <article
               key={label}
-              className="group relative flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
+              className="group relative flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
             >
-              <div className="flex items-center justify-between gap-3">
-                <div className={cn("rounded-full p-3", iconBg)}>
+              <div className="flex items-center justify-between gap-2">
+                <div className={cn("rounded-full p-2.5", iconBg)}>
                   <Icon className={cn("h-5 w-5", iconColor)} />
                 </div>
-                <p className="text-2xl font-semibold text-slate-900">{value}</p>
+                <p className="text-3xl font-semibold text-slate-900 tabular-nums">{value}</p>
               </div>
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">{label}</h2>

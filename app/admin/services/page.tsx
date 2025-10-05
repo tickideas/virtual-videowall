@@ -158,7 +158,7 @@ export default function ServicesPage() {
             <p className="text-gray-500">Loading services...</p>
           </div>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {services.map((service) => (
               <div
                 key={service.id}
