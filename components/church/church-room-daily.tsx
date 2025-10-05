@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import DailyIframe, { DailyCall, DailyEventObjectParticipant } from "@daily-co/daily-js";
 import { Button } from "@/components/ui/button";
-import { Video, VideoOff, PhoneOff, Signal } from "lucide-react";
+import { Video, VideoOff, PhoneOff, Signal, RefreshCw } from "lucide-react";
 
 interface ChurchRoomProps {
   token: string;
@@ -21,6 +21,8 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
   const [isJoined, setIsJoined] = useState(false);
   const [connectionError, setConnectionError] = useState<string>("");
   const [reconnecting, setReconnecting] = useState(false);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
+  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const destroyPromiseRef = useRef<Promise<void> | null>(null);
 
@@ -179,7 +181,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
               width: { ideal: videoConstraints.width },
               height: { ideal: videoConstraints.height },
               frameRate: { ideal: videoConstraints.frameRate, max: videoConstraints.frameRate },
-              facingMode: "user",
+              facingMode: facingMode,
             },
             audio: false,
           });
@@ -254,6 +256,9 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
 
     initializeCall();
 
+    // Capture ref values for cleanup
+    const currentVideoRef = videoRef.current;
+
     // Cleanup
     return () => {
       isMounted = false;
@@ -281,12 +286,13 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       setIsCameraEnabled(false);
 
       // Clean up any remaining video element
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-        videoRef.current.load();
+      if (currentVideoRef) {
+        currentVideoRef.srcObject = null;
+        currentVideoRef.load();
       }
     };
-  }, [token, roomUrl, onLeave]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, roomUrl, onLeave]); // facingMode is intentionally not included - camera switching is handled separately
 
   // Handle video element
   useEffect(() => {
@@ -319,6 +325,56 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
     onLeave();
   }, [callObject, onLeave]);
 
+  const toggleVideo = useCallback(async () => {
+    if (!callObject) return;
+    
+    try {
+      const newState = !isCameraEnabled;
+      await callObject.setLocalVideo(newState);
+      setIsCameraEnabled(newState);
+      console.log("Church: Video toggled to", newState);
+    } catch (error) {
+      console.error("Church: Failed to toggle video", error);
+      setConnectionError("Failed to toggle video");
+    }
+  }, [callObject, isCameraEnabled]);
+
+  const switchCamera = useCallback(async () => {
+    if (!callObject || isSwitchingCamera) return;
+    
+    setIsSwitchingCamera(true);
+    try {
+      const newFacingMode = facingMode === "user" ? "environment" : "user";
+      const videoConstraints = getOptimalVideoConstraints();
+      
+      // Get new video stream with different camera
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: videoConstraints.width },
+          height: { ideal: videoConstraints.height },
+          frameRate: { ideal: videoConstraints.frameRate, max: videoConstraints.frameRate },
+          facingMode: newFacingMode,
+        },
+        audio: false,
+      });
+
+      // Update the video source in Daily
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        await callObject.setInputDevicesAsync({
+          videoSource: videoTrack,
+        });
+        setFacingMode(newFacingMode);
+        console.log("Church: Camera switched to", newFacingMode);
+      }
+    } catch (error) {
+      console.error("Church: Failed to switch camera", error);
+      setConnectionError("Failed to switch camera");
+    } finally {
+      setIsSwitchingCamera(false);
+    }
+  }, [callObject, facingMode, isSwitchingCamera]);
+
   const getConnectionQualityColor = () => {
     switch (connectionQuality) {
       case "good":
@@ -350,16 +406,40 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
               </span>
             </div>
 
-            <div className="flex items-center gap-2 rounded-lg bg-white/10 px-2 py-2">
+            <Button
+              onClick={toggleVideo}
+              variant="ghost"
+              size="sm"
+              disabled={!isJoined}
+              className={`px-2 sm:px-3 ${
+                isCameraEnabled 
+                  ? 'bg-white/10 hover:bg-white/20' 
+                  : 'bg-red-500/20 hover:bg-red-500/30'
+              }`}
+            >
               {isCameraEnabled ? (
                 <Video className="h-4 w-4 text-green-400" />
               ) : (
                 <VideoOff className="h-4 w-4 text-red-400" />
               )}
-              <span className="hidden text-xs text-white xs:inline sm:text-sm">
+              <span className="hidden ml-1 text-xs text-white sm:inline sm:text-sm">
                 {isCameraEnabled ? "On" : "Off"}
               </span>
-            </div>
+            </Button>
+
+            <Button
+              onClick={switchCamera}
+              variant="ghost"
+              size="sm"
+              disabled={!isJoined || isSwitchingCamera || !isCameraEnabled}
+              className="px-2 sm:px-3 bg-white/10 hover:bg-white/20"
+              title={facingMode === "user" ? "Switch to back camera" : "Switch to front camera"}
+            >
+              <RefreshCw className={`h-4 w-4 text-white ${isSwitchingCamera ? 'animate-spin' : ''}`} />
+              <span className="hidden ml-1 text-xs text-white sm:inline sm:text-sm">
+                {facingMode === "user" ? "Back" : "Front"}
+              </span>
+            </Button>
 
             <Button
               onClick={handleLeave}
