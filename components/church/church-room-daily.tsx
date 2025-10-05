@@ -26,6 +26,29 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
   const videoRef = useRef<HTMLVideoElement>(null);
   const destroyPromiseRef = useRef<Promise<void> | null>(null);
 
+  // Helper function to get optimal video constraints based on network
+  const getOptimalVideoConstraints = useCallback(() => {
+    type VideoConstraintProfile = {
+      width: number;
+      height: number;
+      frameRate: number;
+    };
+
+    const navigatorWithConnection = navigator as Navigator & {
+      connection?: { effectiveType?: string };
+    };
+    const effectiveType = navigatorWithConnection.connection?.effectiveType ?? "4g";
+
+    const profiles: Record<string, VideoConstraintProfile> = {
+      "slow-2g": { width: 120, height: 90, frameRate: 4 },
+      "2g": { width: 160, height: 120, frameRate: 6 },
+      "3g": { width: 240, height: 180, frameRate: 8 },
+      "4g": { width: 320, height: 240, frameRate: 12 },
+    };
+
+    return profiles[effectiveType] ?? profiles["3g"];
+  }, []);
+
   // Initialize Daily.co call
   useEffect(() => {
     if (!token || !roomUrl) {
@@ -124,28 +147,6 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
         track.stop();
         track.enabled = false;
       });
-    };
-
-    type VideoConstraintProfile = {
-      width: number;
-      height: number;
-      frameRate: number;
-    };
-
-    const getOptimalVideoConstraints = (): VideoConstraintProfile => {
-      const navigatorWithConnection = navigator as Navigator & {
-        connection?: { effectiveType?: string };
-      };
-      const effectiveType = navigatorWithConnection.connection?.effectiveType ?? "4g";
-
-      const profiles: Record<string, VideoConstraintProfile> = {
-        "slow-2g": { width: 120, height: 90, frameRate: 4 },
-        "2g": { width: 160, height: 120, frameRate: 6 },
-        "3g": { width: 240, height: 180, frameRate: 8 },
-        "4g": { width: 320, height: 240, frameRate: 12 },
-      };
-
-      return profiles[effectiveType] ?? profiles["3g"];
     };
 
     const initializeCall = async () => {
@@ -373,7 +374,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
     } finally {
       setIsSwitchingCamera(false);
     }
-  }, [callObject, facingMode, isSwitchingCamera]);
+  }, [callObject, facingMode, isSwitchingCamera, getOptimalVideoConstraints]);
 
   const getConnectionQualityColor = () => {
     switch (connectionQuality) {
