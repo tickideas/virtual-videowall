@@ -44,6 +44,8 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
       return;
     }
 
+    console.log(`VideoTile [${participant.user_name}]: useEffect triggered - track state:`, participant.tracks?.video?.state);
+
     // eslint-disable-next-line prefer-const
     let loadingTimeout: NodeJS.Timeout;
 
@@ -274,7 +276,7 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
       cleanupStream();
       setHasVideo(false);
     };
-  }, [participant, callObject]);
+  }, [participant, callObject, participant.tracks?.video?.state, participant.tracks?.video?.track?.id]);
 
   return (
     <div
