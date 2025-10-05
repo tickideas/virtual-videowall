@@ -164,18 +164,26 @@ const VideoTile = memo(function VideoTile({ participant, callObject }: VideoTile
         readyState: videoTrack?.readyState,
         videoState,
         hasVideoElement: !!videoRef.current,
+        subscribed: latestParticipant.tracks?.video?.subscribed,
       });
 
-      // Only reject if track doesn't exist, is ended, or is explicitly blocked
-      // Be permissive with state - accept "off", "loading", "playable", "interrupted" etc.
-      const shouldSkip = !videoTrack ||
-                        videoTrack.readyState === "ended" ||
-                        videoState === "blocked";
+      // Only reject if track doesn't exist or is ended
+      // Be very permissive with state - even if state is "blocked", try to attach
+      const shouldSkip = !videoTrack || videoTrack.readyState === "ended";
 
       if (shouldSkip) {
-        console.log(`VideoTile [${participant.user_name}]: Skipping track update`, { videoTrack: !!videoTrack, readyState: videoTrack?.readyState, videoState });
-        cleanupStream();
-        setHasVideo(false);
+        console.log(`VideoTile [${participant.user_name}]: Skipping track update`, { 
+          videoTrack: !!videoTrack, 
+          readyState: videoTrack?.readyState, 
+          videoState,
+          reason: !videoTrack ? 'no track' : 'track ended'
+        });
+        
+        // Don't cleanup immediately if it's just a state issue, only if track is truly gone
+        if (!videoTrack) {
+          cleanupStream();
+          setHasVideo(false);
+        }
         return;
       }
 
@@ -187,7 +195,7 @@ const VideoTile = memo(function VideoTile({ participant, callObject }: VideoTile
         return;
       }
 
-      console.log(`VideoTile [${participant.user_name}]: Attaching new track`, videoTrack.id);
+      console.log(`VideoTile [${participant.user_name}]: Attaching new track`, videoTrack.id, 'with state:', videoState);
       attachTrackToElement(videoTrack);
     };
 
@@ -333,9 +341,14 @@ const VideoTile = memo(function VideoTile({ participant, callObject }: VideoTile
     </div>
   );
 }, (prevProps, nextProps) => {
+  // Be more lenient with re-renders to ensure video tracks appear
+  const prevTrack = prevProps.participant.tracks?.video;
+  const nextTrack = nextProps.participant.tracks?.video;
+  
   return prevProps.participant.session_id === nextProps.participant.session_id &&
-         prevProps.participant.tracks?.video?.state === nextProps.participant.tracks?.video?.state &&
-         prevProps.participant.tracks?.video?.subscribed === nextProps.participant.tracks?.video?.subscribed &&
+         prevTrack?.state === nextTrack?.state &&
+         prevTrack?.subscribed === nextTrack?.subscribed &&
+         prevTrack?.track?.id === nextTrack?.track?.id &&
          prevProps.callObject === nextProps.callObject;
 });
 
@@ -364,13 +377,21 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
         const subscribedState = videoTrackState?.subscribed;
         const isSubscribed = subscribedState === true;
 
-        if (!participant.local && videoTrackState && !isSubscribed) {
-          trackUpdates[participant.session_id] = {
-            video: {
-              subscribed: true,
-              layer: 0,
-            },
-          };
+        if (!participant.local && videoTrackState) {
+          console.log(`Wall: Checking subscription for ${participant.user_name}:`, {
+            subscribed: subscribedState,
+            state: videoTrackState.state,
+            hasTrack: !!videoTrackState.track,
+          });
+
+          if (!isSubscribed) {
+            trackUpdates[participant.session_id] = {
+              video: {
+                subscribed: true,
+                layer: 0,
+              },
+            };
+          }
         }
       });
 
@@ -378,7 +399,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
         try {
           // @ts-expect-error - Daily.js types are not up to date
           await daily.updateReceiveSettings({ tracks: trackUpdates });
-          console.log("Wall: Forced subscription for", Object.keys(trackUpdates).length, "participant(s)");
+          console.log("Wall: Forced subscription for", Object.keys(trackUpdates).length, "participant(s):", trackUpdates);
         } catch (subscriptionError) {
           console.error("Wall: Failed to enforce subscriptions", subscriptionError);
         }
@@ -517,9 +538,23 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
 
     initializeCall();
 
+    // Periodic subscription check to catch any missed tracks
+    const subscriptionCheckInterval = setInterval(() => {
+      if (activeCall && isMounted) {
+        const currentParticipants = Object.values(activeCall.participants())
+          .filter((p) => !p.local);
+        
+        if (currentParticipants.length > 0) {
+          console.log("Wall: Periodic subscription check for", currentParticipants.length, "participants");
+          void ensureSubscriptions(activeCall, currentParticipants);
+        }
+      }
+    }, 5000); // Check every 5 seconds
+
     // Cleanup
     return () => {
       isMounted = false;
+      clearInterval(subscriptionCheckInterval);
 
       const daily = callObjectRef.current;
       if (daily) {
@@ -650,7 +685,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
             </div>
           </div>
         ) : (
-          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 320px))', justifyContent: 'center' }}>
+          <div className="grid gap-4 sm:gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', justifyContent: 'center', maxWidth: '100%' }}>
             {currentParticipants.map((participant) => (
               <VideoTile
                 key={participant.session_id}
