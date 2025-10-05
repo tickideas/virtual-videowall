@@ -17,6 +17,7 @@ model Church {
   sessions  Session[]
 
   @@index([code])
+  @@index([name])
 }
 
 model Service {
@@ -49,6 +50,8 @@ model Session {
 
   @@index([serviceId, isActive])
   @@index([churchId])
+  @@index([joinedAt])
+  @@index([joinedAt, leftAt])
 }
 
 model User {

@@ -4,16 +4,33 @@ import { generateSessionCode } from "@/lib/utils";
 
 export async function GET() {
   try {
-    const churches = await prisma.church.findMany({
-      orderBy: { name: "asc" },
-      include: {
-        _count: {
-          select: { sessions: true },
-        },
-      },
-    });
+    const churches = await prisma.$queryRaw`
+      SELECT
+        c.*,
+        COUNT(s.id) as "sessionCount"
+      FROM "Church" c
+      LEFT JOIN "Session" s ON c.id = s."churchId"
+      GROUP BY c.id, c.name, c.code, c.location, c."createdAt", c."updatedAt"
+      ORDER BY c.name ASC
+    ` as Array<{
+      id: string;
+      name: string;
+      code: string;
+      location: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+      sessionCount: bigint;
+    }>;
 
-    return NextResponse.json({ churches });
+    const formattedChurches = churches.map(church => ({
+      ...church,
+      sessionCount: Number(church.sessionCount),
+      _count: {
+        sessions: Number(church.sessionCount)
+      }
+    }));
+
+    return NextResponse.json({ churches: formattedChurches });
   } catch (error) {
     console.error("Error fetching churches:", error);
     return NextResponse.json(

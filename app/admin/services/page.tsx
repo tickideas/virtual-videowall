@@ -158,62 +158,61 @@ export default function ServicesPage() {
             <p className="text-gray-500">Loading services...</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
             {services.map((service) => (
               <div
                 key={service.id}
-                className="bg-white rounded-xl shadow-sm p-6 border border-gray-200"
+                className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 flex flex-col"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex gap-4">
-                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                      <Calendar className="w-6 h-6 text-green-600" />
+                <div className="flex items-start gap-4 flex-1">
+                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                    <Calendar className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-lg text-gray-900 truncate">{service.name}</h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {format(new Date(service.startTime), "PPP p")}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3 mt-3">
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        service.active
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-700"
+                      }`}>
+                        {service.active ? "Active" : "Inactive"}
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        {service._count.sessions} / {service.maxChurches} churches
+                      </span>
                     </div>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between gap-3">
+                  <div className="bg-gray-50 rounded-lg px-4 py-2 flex items-center gap-2">
                     <div>
-                      <h3 className="font-semibold text-lg text-gray-900">{service.name}</h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {format(new Date(service.startTime), "PPP p")}
+                      <p className="text-xs text-gray-600 mb-0.5">Session Code</p>
+                      <p className="text-xl font-mono font-bold text-gray-900">
+                        {service.sessionCode}
                       </p>
-                      <div className="flex items-center gap-4 mt-3">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          service.active
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-700"
-                        }`}>
-                          {service.active ? "Active" : "Inactive"}
-                        </span>
-                        <span className="text-sm text-gray-600">
-                          {service._count.sessions} / {service.maxChurches} churches
-                        </span>
-                      </div>
                     </div>
+                    <button
+                      onClick={() => copyCode(service.sessionCode)}
+                      className="p-2 hover:bg-gray-200 rounded transition-colors"
+                      title="Copy session code"
+                    >
+                      {copiedCode === service.sessionCode ? (
+                        <Check className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <Copy className="w-4 h-4 text-gray-600" />
+                      )}
+                    </button>
                   </div>
-                  <div className="flex flex-col gap-2 items-end">
-                    <div className="bg-gray-50 rounded-lg p-3 text-center">
-                      <p className="text-xs text-gray-600 mb-1">Session Code</p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-2xl font-mono font-bold text-gray-900">
-                          {service.sessionCode}
-                        </p>
-                        <button
-                          onClick={() => copyCode(service.sessionCode)}
-                          className="p-1 hover:bg-gray-200 rounded"
-                        >
-                          {copiedCode === service.sessionCode ? (
-                            <Check className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <Copy className="w-4 h-4 text-gray-600" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                    <Link href={`/wall/${service.sessionCode}`} target="_blank">
-                      <Button size="sm" variant="outline">
-                        <ExternalLink className="w-4 h-4" />
-                        Open Wall
-                      </Button>
-                    </Link>
-                  </div>
+                  <Link href={`/wall/${service.sessionCode}`} target="_blank">
+                    <Button size="sm" variant="outline" className="whitespace-nowrap">
+                      <ExternalLink className="w-4 h-4 mr-1" />
+                      Open Wall
+                    </Button>
+                  </Link>
                 </div>
               </div>
             ))}

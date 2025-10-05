@@ -156,7 +156,7 @@ export default function ChurchesPage() {
           </div>
         ) : (
           <>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4">
               {churches.map((church) => (
               <div key={church.id} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div className="flex items-start gap-4">
@@ -195,34 +195,53 @@ export default function ChurchesPage() {
 
             {/* Delete Confirmation Modal */}
             {churchToDelete && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-modal-title"
+              aria-describedby="delete-modal-description"
+            >
               <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center" aria-hidden="true">
                     <AlertTriangle className="w-5 h-5 text-red-600" />
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900">Delete Church</h3>
+                  <h3 id="delete-modal-title" className="text-lg font-semibold text-gray-900">
+                    Delete Church
+                  </h3>
                 </div>
-                
-                <p className="text-gray-600 mb-6">
-                  Are you sure you want to delete <span className="font-semibold">{churchToDelete.name}</span>? 
+
+                <p id="delete-modal-description" className="text-gray-600 mb-6">
+                  Are you sure you want to delete <span className="font-semibold">{churchToDelete.name}</span>?
                   This action cannot be undone.
                 </p>
 
                 {churchToDelete._count.sessions > 0 && (
-                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg" role="alert">
                     <p className="text-sm text-yellow-800">
-                      This church has {churchToDelete._count.sessions} session(s). 
+                      ⚠️ This church has {churchToDelete._count.sessions} session(s).
                       You cannot delete churches with existing sessions.
                     </p>
                   </div>
                 )}
+
+                <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Church Details:</h4>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li><strong>Name:</strong> {churchToDelete.name}</li>
+                    {churchToDelete.location && <li><strong>Location:</strong> {churchToDelete.location}</li>}
+                    <li><strong>Code:</strong> <span className="font-mono">{churchToDelete.code}</span></li>
+                    <li><strong>Sessions:</strong> {churchToDelete._count.sessions}</li>
+                  </ul>
+                </div>
 
                 <div className="flex gap-3">
                   <Button
                     variant="outline"
                     onClick={() => setChurchToDelete(null)}
                     className="flex-1"
+                    aria-label="Cancel deletion"
                   >
                     Cancel
                   </Button>
@@ -231,15 +250,16 @@ export default function ChurchesPage() {
                     onClick={handleDelete}
                     disabled={deleting || churchToDelete._count.sessions > 0}
                     className="flex-1"
+                    aria-label={churchToDelete._count.sessions > 0 ? "Cannot delete church with sessions" : "Confirm deletion of church"}
                   >
                     {deleting ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" aria-hidden="true" />
                         Deleting...
                       </>
                     ) : (
                       <>
-                        <Trash2 className="w-4 h-4 mr-2" />
+                        <Trash2 className="w-4 h-4 mr-2" aria-hidden="true" />
                         Delete
                       </>
                     )}

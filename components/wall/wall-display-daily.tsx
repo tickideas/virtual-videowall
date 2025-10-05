@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, memo, useMemo } from "react";
 import DailyIframe, { DailyCall, DailyParticipant, DailyEventObjectTrack, DailyEventObjectParticipant } from "@daily-co/daily-js";
 import { ChevronLeft, ChevronRight, Maximize, Users, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,10 +17,12 @@ interface VideoTileProps {
   callObject: DailyCall | null;
 }
 
-function VideoTile({ participant, callObject }: VideoTileProps) {
+const VideoTile = memo(function VideoTile({ participant, callObject }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasVideo, setHasVideo] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const streamRef = useRef<MediaStream | null>(null);
   const lastTrackIdRef = useRef<string | null>(null);
 
@@ -42,8 +44,16 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
       return;
     }
 
+    // eslint-disable-next-line prefer-const
+    let loadingTimeout: NodeJS.Timeout;
+
+    // Set initial loading state
+    setIsLoading(true);
+    setConnectionStatus('connecting');
+
     const attemptPlayback = async () => {
       if (!videoRef.current) {
+        console.log(`VideoTile [${participant.user_name}]: No video ref for playback`);
         return;
       }
 
@@ -55,23 +65,39 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
         videoRef.current.setAttribute("muted", "muted");
         videoRef.current.setAttribute("playsinline", "true");
 
+        console.log(`VideoTile [${participant.user_name}]: Attempting playback`);
         await videoRef.current.play();
+        console.log(`VideoTile [${participant.user_name}]: Playback started successfully`);
         setAutoplayBlocked(false);
-      } catch {
-        console.warn("VideoTile: Autoplay blocked for", participant.user_name);
+        setConnectionStatus('connected');
+      } catch (error) {
+        console.warn(`VideoTile [${participant.user_name}]: Autoplay blocked or playback failed`, error);
         setAutoplayBlocked(true);
+        setConnectionStatus('disconnected');
       }
     };
 
-    const cleanupStream = () => {
+    const cleanupStream = (hardReset: boolean = false) => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => {
+          if (hardReset) {
+            track.stop?.();
+          }
+          track.enabled = false;
+        });
+      }
+
       lastTrackIdRef.current = null;
       streamRef.current = null;
 
       if (videoRef.current) {
         videoRef.current.srcObject = null;
+        videoRef.current.load();
       }
 
       setAutoplayBlocked(false);
+      setIsLoading(true);
+      setConnectionStatus('disconnected');
     };
 
     const getParticipantSnapshot = () => {
@@ -85,7 +111,15 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
     };
 
     const attachTrackToElement = (track: MediaStreamTrack | null, stream?: MediaStream | null) => {
+      console.log(`VideoTile [${participant.user_name}]: attachTrackToElement called`, {
+        hasTrack: !!track,
+        trackId: track?.id,
+        trackReadyState: track?.readyState,
+        hasVideoRef: !!videoRef.current,
+      });
+
       if (!track) {
+        console.log(`VideoTile [${participant.user_name}]: No track to attach, cleaning up`);
         cleanupStream();
         setHasVideo(false);
         return false;
@@ -95,12 +129,25 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
       streamRef.current = resolvedStream;
       lastTrackIdRef.current = track.id;
 
+      console.log(`VideoTile [${participant.user_name}]: Stream created, attaching to video element`);
+
       if (videoRef.current) {
         videoRef.current.srcObject = resolvedStream;
+        console.log(`VideoTile [${participant.user_name}]: srcObject set, attempting playback`);
         void attemptPlayback();
+      } else {
+        console.warn(`VideoTile [${participant.user_name}]: Video element not available yet`);
       }
 
       setHasVideo(true);
+      setIsLoading(false);
+      setConnectionStatus('connected');
+
+      // Clear loading timeout if video loads successfully
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+      }
+
       return true;
     };
 
@@ -112,25 +159,43 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
         (latestParticipant.tracks?.video as { persistentTrack?: MediaStreamTrack })?.persistentTrack ??
         null;
 
-      // Only reject if track is explicitly ended or off, or doesn't exist
-      const shouldSkip = !videoTrack || 
-                        videoTrack.readyState === "ended" || 
-                        videoState === "off" ||
+      console.log(`VideoTile [${participant.user_name}]: updateVideoTrack`, {
+        videoTrack: videoTrack?.id,
+        readyState: videoTrack?.readyState,
+        videoState,
+        hasVideoElement: !!videoRef.current,
+      });
+
+      // Only reject if track doesn't exist, is ended, or is explicitly blocked
+      // Be permissive with state - accept "off", "loading", "playable", "interrupted" etc.
+      const shouldSkip = !videoTrack ||
+                        videoTrack.readyState === "ended" ||
                         videoState === "blocked";
 
       if (shouldSkip) {
+        console.log(`VideoTile [${participant.user_name}]: Skipping track update`, { videoTrack: !!videoTrack, readyState: videoTrack?.readyState, videoState });
         cleanupStream();
         setHasVideo(false);
         return;
       }
 
       if (lastTrackIdRef.current === videoTrack.id && videoRef.current?.srcObject) {
+        console.log(`VideoTile [${participant.user_name}]: Track already attached`);
         setHasVideo(true);
+        setIsLoading(false);
+        setConnectionStatus('connected');
         return;
       }
 
+      console.log(`VideoTile [${participant.user_name}]: Attaching new track`, videoTrack.id);
       attachTrackToElement(videoTrack);
     };
+
+    // Set a timeout to stop showing loading state after reasonable time
+    loadingTimeout = setTimeout(() => {
+      setIsLoading(false);
+      setConnectionStatus('disconnected');
+    }, 10000); // 10 seconds
 
     // Initial update
     updateVideoTrack();
@@ -142,6 +207,12 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
     };
 
     const handleTrackStarted = (event: DailyEventObjectTrack) => {
+      console.log(`VideoTile [${participant.user_name}]: track-started event`, {
+        trackKind: event.track?.kind,
+        participantId: event.participant?.session_id,
+        matchesThisParticipant: event.participant?.session_id === participant.session_id,
+      });
+
       if (event.track?.kind !== "video") {
         return;
       }
@@ -151,6 +222,7 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
         const incomingTrack = event.track ?? null;
         const incomingStream = incomingTrack ? new MediaStream([incomingTrack]) : null;
 
+        console.log(`VideoTile [${participant.user_name}]: Received track-started for this participant`);
         if (!attachTrackToElement(incomingTrack, incomingStream ?? undefined)) {
           handleRelevantChange(participantId);
         }
@@ -188,21 +260,34 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
       callObject.off("participant-updated", handleParticipantUpdated);
       callObject.off("participant-left", handleParticipantLeft);
 
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+      }
       cleanupStream();
       setHasVideo(false);
     };
   }, [participant, callObject]);
 
   return (
-    <div className="relative bg-gray-800 rounded-lg overflow-hidden aspect-video">
-      {hasVideo ? (
+    <div
+      className="relative overflow-hidden rounded-lg bg-gray-800"
+      style={{ aspectRatio: "16 / 9" }}
+    >
+      {isLoading ? (
+        <div className="w-full h-full flex items-center justify-center bg-gray-900">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-3"></div>
+            <p className="text-gray-400 text-sm">Connecting...</p>
+          </div>
+        </div>
+      ) : hasVideo ? (
         <div className="relative h-full w-full">
           <video
             ref={videoRef}
             autoPlay
             playsInline
             muted
-            className="w-full h-full object-cover"
+            className="h-full w-full object-cover"
           />
           {autoplayBlocked && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/70">
@@ -210,25 +295,49 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
                 variant="outline"
                 className="bg-white/10 border-white/40 text-white hover:bg-white/20"
                 onClick={handleManualPlay}
+                aria-label="Resume video playback"
               >
                 Resume Video
               </Button>
             </div>
           )}
+          {/* Connection Status Indicator */}
+          <div className="absolute top-2 right-2">
+            <div className={`w-3 h-3 rounded-full ${
+              connectionStatus === 'connected' ? 'bg-green-500' :
+              connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
+            }`} title={`Status: ${connectionStatus}`}></div>
+          </div>
         </div>
       ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <VideoOff className="w-12 h-12 text-gray-600" />
+        <div className="flex h-full w-full items-center justify-center bg-gray-900">
+          <div className="text-center">
+            <VideoOff className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+            <p className="text-gray-400 text-sm">No video</p>
+            {connectionStatus === 'disconnected' && (
+              <p className="text-gray-500 text-xs mt-1">Disconnected</p>
+            )}
+          </div>
         </div>
       )}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
         <p className="text-white text-sm font-medium truncate">
           {participant.user_name || "Unknown Church"}
         </p>
+        {connectionStatus !== 'connected' && (
+          <p className="text-gray-300 text-xs">
+            {connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
+          </p>
+        )}
       </div>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  return prevProps.participant.session_id === nextProps.participant.session_id &&
+         prevProps.participant.tracks?.video?.state === nextProps.participant.tracks?.video?.state &&
+         prevProps.participant.tracks?.video?.subscribed === nextProps.participant.tracks?.video?.subscribed &&
+         prevProps.callObject === nextProps.callObject;
+});
 
 export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDisplayProps) {
   const callObjectRef = useRef<DailyCall | null>(null);
@@ -437,9 +546,12 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
 
   const TILES_PER_PAGE = 20;
   const totalPages = Math.ceil(participants.length / TILES_PER_PAGE);
-  const startIdx = currentPage * TILES_PER_PAGE;
-  const endIdx = startIdx + TILES_PER_PAGE;
-  const currentParticipants = participants.slice(startIdx, endIdx);
+
+  const currentParticipants = useMemo(() => {
+    const startIdx = currentPage * TILES_PER_PAGE;
+    const endIdx = startIdx + TILES_PER_PAGE;
+    return participants.slice(startIdx, endIdx);
+  }, [participants, currentPage]);
 
   const nextPage = useCallback(() => {
     if (currentPage < totalPages - 1) {
@@ -466,15 +578,15 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
   return (
     <div className="h-screen w-screen bg-gray-900 flex flex-col">
       {/* Header */}
-      <div className="flex-none bg-gray-800/50 backdrop-blur-sm px-6 py-4">
-        <div className="flex items-center justify-between">
+      <div className="flex-none bg-gray-800/50 backdrop-blur-sm px-3 sm:px-6 py-2 sm:py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex flex-col gap-1 text-white">
             <div className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              <span className="font-medium">{participants.length} Churches Connected</span>
+              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="font-medium text-sm sm:text-base">{participants.length} Churches Connected</span>
             </div>
-            <div className="text-sm text-gray-300">{serviceName}</div>
-            <div className="flex flex-wrap gap-4 text-xs text-gray-400">
+            <div className="text-xs sm:text-sm text-gray-300 truncate max-w-full">{serviceName}</div>
+            <div className="flex flex-wrap gap-2 sm:gap-4 text-xs text-gray-400">
               <span>Session: {sessionCode}</span>
               {totalPages > 1 && (
                 <span>Page {currentPage + 1} of {totalPages}</span>
@@ -482,28 +594,30 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {totalPages > 1 && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <Button
                   onClick={prevPage}
                   disabled={currentPage === 0}
                   variant="outline"
                   size="sm"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-2 sm:px-3"
+                  aria-label="Previous page"
                 >
-                  <ChevronLeft className="w-4 h-4" />
-                  Previous
+                  <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline ml-1">Previous</span>
                 </Button>
                 <Button
                   onClick={nextPage}
                   disabled={currentPage === totalPages - 1}
                   variant="outline"
                   size="sm"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-2 sm:px-3"
+                  aria-label="Next page"
                 >
-                  Next
-                  <ChevronRight className="w-4 h-4" />
+                  <span className="hidden sm:inline mr-1">Next</span>
+                  <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
                 </Button>
               </div>
             )}
@@ -511,29 +625,32 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
               onClick={toggleFullscreen}
               variant="outline"
               size="sm"
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-2 sm:px-3"
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             >
-              <Maximize className="w-4 h-4" />
-              {isFullscreen ? "Exit" : "Fullscreen"}
+              <Maximize className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline ml-1">
+                {isFullscreen ? "Exit" : "Fullscreen"}
+              </span>
             </Button>
           </div>
         </div>
       </div>
 
       {/* Grid */}
-      <div className="flex-1 overflow-hidden p-4">
+      <div className="flex-1 overflow-y-auto p-4">
         {currentParticipants.length === 0 ? (
           <div className="h-full flex items-center justify-center">
-            <div className="text-center">
-              <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-400 text-xl">Waiting for churches to connect...</p>
+            <div className="text-center px-4">
+              <Users className="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-400 text-lg sm:text-xl">Waiting for churches to connect...</p>
               <p className="text-gray-500 text-sm mt-2">
                 Churches will appear here once they join the service
               </p>
             </div>
           </div>
         ) : (
-          <div className="h-full grid grid-cols-5 grid-rows-4 gap-2 lg:gap-3">
+          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
             {currentParticipants.map((participant) => (
               <VideoTile
                 key={participant.session_id}
