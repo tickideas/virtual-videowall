@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import DailyIframe, { DailyCall, DailyParticipant, DailyEventObjectTrack, DailyEventObjectParticipant } from "@daily-co/daily-js";
 import { ChevronLeft, ChevronRight, Maximize, Users, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ interface VideoTileProps {
   callObject: DailyCall | null;
 }
 
-function VideoTile({ participant, callObject }: VideoTileProps) {
+const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasVideo, setHasVideo] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
@@ -342,7 +342,9 @@ function VideoTile({ participant, callObject }: VideoTileProps) {
       </div>
     </div>
   );
-}
+});
+
+VideoTile.displayName = 'VideoTile';
 
 export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDisplayProps) {
   const callObjectRef = useRef<DailyCall | null>(null);

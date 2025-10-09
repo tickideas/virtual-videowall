@@ -74,6 +74,9 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
 
       if (!joinResponse.ok) {
         const data = await joinResponse.json();
+        if (data.type === 'rate_limit') {
+          throw new Error(data.error || "Too many connection attempts. Please wait a few minutes before trying again.");
+        }
         throw new Error(data.error || "Failed to join session");
       }
 

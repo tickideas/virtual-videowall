@@ -1,0 +1,57 @@
+{
+  "name": "Virtual Video Wall",
+  "short_name": "VideoWall",
+  "description": "Low-bandwidth virtual video wall for church connections",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#1f2937",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["communication", "productivity"],
+  "screenshots": [
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Desktop view of the video wall"
+    },
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile view of the church interface"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Join Service",
+      "short_name": "Join",
+      "description": "Quickly join a church service",
+      "url": "/church",
+      "icons": [{ "src": "/join-icon.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Admin Dashboard",
+      "short_name": "Admin",
+      "description": "Access admin dashboard",
+      "url": "/admin",
+      "icons": [{ "src": "/admin-icon.png", "sizes": "96x96" }]
+    }
+  ]
+}

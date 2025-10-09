@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import DailyIframe, { DailyCall, DailyEventObjectParticipant } from "@daily-co/daily-js";
 import { Button } from "@/components/ui/button";
 import { Video, VideoOff, PhoneOff, Signal, RefreshCw } from "lucide-react";
+import { analytics } from "@/lib/analytics";
 
 interface ChurchRoomProps {
   token: string;
@@ -23,6 +24,13 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
   const [reconnecting, setReconnecting] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
+  const [bandwidthMetrics, setBandwidthMetrics] = useState({
+    upload: 0,
+    download: 0,
+    packetLoss: 0,
+    timestamp: Date.now()
+  });
+  const joinTimeRef = useRef<number>(Date.now());
   const videoRef = useRef<HTMLVideoElement>(null);
   const destroyPromiseRef = useRef<Promise<void> | null>(null);
 
@@ -62,6 +70,8 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       }
       console.log("Church: Joined meeting successfully");
       setIsJoined(true);
+      joinTimeRef.current = Date.now();
+      analytics.trackChurchJoin(serviceName, churchName, true);
     };
 
     const handleLeftMeeting = () => {
@@ -70,6 +80,8 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       }
       console.log("Church: Left meeting");
       setIsJoined(false);
+      const duration = Date.now() - joinTimeRef.current;
+      analytics.trackChurchLeave(serviceName, churchName, duration);
       onLeave();
     };
 
@@ -88,6 +100,25 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       console.log("Church: Network quality", event.quality);
       const quality = event.quality >= 80 ? "good" : event.quality >= 50 ? "low" : "very-low";
       setConnectionQuality(quality);
+
+      // Monitor bandwidth metrics
+      const stats = await callObjectRef.current.getNetworkStats();
+      if (stats) {
+        const metrics = {
+          upload: stats.stats?.latest?.sendBitsPerSecond || 0,
+          download: stats.stats?.latest?.recvBitsPerSecond || 0,
+          packetLoss: 0, // Daily.co doesn't provide packet loss directly
+          timestamp: Date.now()
+        };
+        setBandwidthMetrics(metrics);
+        
+        // Track connection quality analytics
+        analytics.trackConnectionQuality(
+          quality,
+          (metrics.upload + metrics.download) / 1000, // Convert to kbps
+          metrics.packetLoss
+        );
+      }
 
       // Dynamically adjust video quality based on network conditions
       if (event.quality < 50 && callObjectRef.current) {
@@ -115,6 +146,9 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       console.error("Church: Daily.co error", error);
       const errorMessage = error.errorMsg || "Connection error occurred";
       setConnectionError(errorMessage);
+      
+      // Track video errors for analytics
+      analytics.trackVideoError(errorMessage, 'church_room');
 
       // Attempt reconnection for certain error types
       if (errorMessage.includes("network") || errorMessage.includes("connection")) {
@@ -405,6 +439,11 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
               <span className="text-sm text-white capitalize">
                 {connectionQuality === "very-low" ? "Poor" : connectionQuality}
               </span>
+              {bandwidthMetrics.upload > 0 && (
+                <span className="text-xs text-gray-300 ml-1">
+                  {Math.round(bandwidthMetrics.upload / 1000)}kbps
+                </span>
+              )}
             </div>
 
             <Button
@@ -461,6 +500,11 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
             <span className="text-xs text-white capitalize">
               {connectionQuality === "very-low" ? "Poor" : connectionQuality}
             </span>
+            {bandwidthMetrics.upload > 0 && (
+              <span className="text-xs text-gray-300 ml-1">
+                {Math.round(bandwidthMetrics.upload / 1000)}kbps
+              </span>
+            )}
           </div>
         </div>
       </header>

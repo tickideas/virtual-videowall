@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateSessionCode } from "@/lib/utils";
+import { analytics } from "@/lib/analytics";
 
 export async function GET() {
   try {
@@ -67,6 +68,8 @@ export async function POST(request: NextRequest) {
         location,
       },
     });
+
+    analytics.trackChurchCreated(name, code);
 
     return NextResponse.json({ church });
   } catch (error) {

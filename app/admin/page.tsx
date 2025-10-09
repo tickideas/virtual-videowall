@@ -28,6 +28,9 @@ export default function AdminLoginPage() {
 
       if (!response.ok) {
         const data = await response.json();
+        if (data.type === 'rate_limit') {
+          throw new Error(data.error || "Too many login attempts. Please wait a few minutes before trying again.");
+        }
         throw new Error(data.error || "Login failed");
       }
 
