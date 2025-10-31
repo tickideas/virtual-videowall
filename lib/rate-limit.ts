@@ -74,16 +74,10 @@ export function createRateLimit(options: RateLimitOptions) {
 
     // Increment counter
     entry.count++;
-    
-    // Add rate limit headers to successful requests
-    const remaining = max - entry.count;
-    return NextResponse.next({
-      headers: {
-        'X-RateLimit-Limit': max.toString(),
-        'X-RateLimit-Remaining': remaining.toString(),
-        'X-RateLimit-Reset': entry.resetTime.toString(),
-      }
-    });
+
+    // Return null to allow the request to proceed
+    // (Rate limit headers can be added by the API route if needed)
+    return null;
   };
 }
 
