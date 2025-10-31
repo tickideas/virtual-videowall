@@ -1,9 +1,16 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
-import { WallDisplay } from "@/components/wall/wall-display-daily";
+import { use, useEffect, useRef, useState, Suspense, lazy } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { retryFetch } from "@/lib/retry";
+
+// Lazy load the heavy WallDisplay component (includes Daily.co video grid)
+const WallDisplay = lazy(() =>
+  import("@/components/wall/wall-display-daily").then((mod) => ({
+    default: mod.WallDisplay,
+  }))
+);
 
 interface Service {
   id: string;
@@ -44,7 +51,15 @@ export default function WallPage({
 
     const fetchService = async () => {
       try {
-        const response = await fetch(`/api/service/${resolvedParams.sessionCode}`);
+        const response = await retryFetch(
+          `/api/service/${resolvedParams.sessionCode}`,
+          {},
+          {
+            maxAttempts: 2,
+            initialDelayMs: 500,
+          }
+        );
+
         if (!response.ok) {
           throw new Error("Service not found");
         }
@@ -83,14 +98,21 @@ export default function WallPage({
     const fetchToken = async () => {
       try {
         tokenRequestedRef.current = true;
-        const tokenResponse = await fetch("/api/livekit/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionCode: resolvedParams.sessionCode,
-            participantType: "viewer",
-          }),
-        });
+        const tokenResponse = await retryFetch(
+          "/api/livekit/token",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionCode: resolvedParams.sessionCode,
+              participantType: "viewer",
+            }),
+          },
+          {
+            maxAttempts: 3,
+            initialDelayMs: 1000,
+          }
+        );
 
         if (tokenResponse.ok) {
           const tokenData = await tokenResponse.json();
@@ -152,11 +174,22 @@ export default function WallPage({
   }
 
   return (
-    <WallDisplay
-      token={token}
-      roomUrl={roomUrl}
-      serviceName={service.name}
-      sessionCode={resolvedParams.sessionCode}
-    />
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-900">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 text-white animate-spin mx-auto mb-4" />
+            <p className="text-white text-lg">Loading video wall...</p>
+          </div>
+        </div>
+      }
+    >
+      <WallDisplay
+        token={token}
+        roomUrl={roomUrl}
+        serviceName={service.name}
+        sessionCode={resolvedParams.sessionCode}
+      />
+    </Suspense>
   );
 }

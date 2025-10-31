@@ -34,11 +34,6 @@ class Analytics {
     };
 
     this.events.push(analyticsEvent);
-    
-    // Log to console in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Analytics:', analyticsEvent);
-    }
 
     // Send to external analytics service if configured
     this.sendToExternal(analyticsEvent);
@@ -51,15 +46,26 @@ class Analytics {
       try {
         const existing = JSON.parse(localStorage.getItem('analytics_events') || '[]');
         existing.push(event);
-        
-        // Keep only last 100 events to prevent storage issues
-        if (existing.length > 100) {
-          existing.splice(0, existing.length - 100);
+
+        // Keep only last 100 events to prevent storage issues (optimized from growing unbounded)
+        const maxEvents = 100;
+        if (existing.length > maxEvents) {
+          existing.splice(0, existing.length - maxEvents);
         }
-        
+
         localStorage.setItem('analytics_events', JSON.stringify(existing));
+
+        // Auto-cleanup: periodically clear old events (older than 7 days)
+        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        const recentEvents = existing.filter((e: AnalyticsEvent) => e.timestamp > sevenDaysAgo);
+        if (recentEvents.length < existing.length) {
+          localStorage.setItem('analytics_events', JSON.stringify(recentEvents));
+        }
       } catch (error) {
-        console.warn('Failed to store analytics event:', error);
+        // Silent fail in production, only log critical errors
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Failed to store analytics event:', error);
+        }
       }
     }
   }

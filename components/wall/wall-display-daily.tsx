@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import DailyIframe, { DailyCall, DailyParticipant, DailyEventObjectTrack, DailyEventObjectParticipant } from "@daily-co/daily-js";
 import { ChevronLeft, ChevronRight, Maximize, Users, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { logger } from "@/lib/logger";
+import { VIDEO_WALL, TIMEOUTS } from "@/lib/constants";
 
 interface WallDisplayProps {
   token: string;
@@ -35,7 +37,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
       await videoRef.current.play();
       setAutoplayBlocked(false);
     } catch (error) {
-      console.warn("VideoTile: manual play failed", error);
+      logger.warn("VideoTile: manual play failed", error);
     }
   }, []);
 
@@ -44,7 +46,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
       return;
     }
 
-    console.log(`VideoTile [${participant.user_name}]: useEffect triggered - track state:`, participant.tracks?.video?.state);
+    logger.wall(`VideoTile [${participant.user_name}]: useEffect triggered - track state:`, participant.tracks?.video?.state);
 
     // eslint-disable-next-line prefer-const
     let loadingTimeout: NodeJS.Timeout;
@@ -55,7 +57,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
 
     const attemptPlayback = async () => {
       if (!videoRef.current) {
-        console.log(`VideoTile [${participant.user_name}]: No video ref for playback`);
+        logger.wall(`VideoTile [${participant.user_name}]: No video ref for playback`);
         return;
       }
 
@@ -67,13 +69,13 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
         videoRef.current.setAttribute("muted", "muted");
         videoRef.current.setAttribute("playsinline", "true");
 
-        console.log(`VideoTile [${participant.user_name}]: Attempting playback`);
+        logger.wall(`VideoTile [${participant.user_name}]: Attempting playback`);
         await videoRef.current.play();
-        console.log(`VideoTile [${participant.user_name}]: Playback started successfully`);
+        logger.wall(`VideoTile [${participant.user_name}]: Playback started successfully`);
         setAutoplayBlocked(false);
         setConnectionStatus('connected');
       } catch (error) {
-        console.warn(`VideoTile [${participant.user_name}]: Autoplay blocked or playback failed`, error);
+        logger.warn(`VideoTile [${participant.user_name}]: Autoplay blocked or playback failed`, error);
         setAutoplayBlocked(true);
         setConnectionStatus('disconnected');
       }
@@ -113,7 +115,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
     };
 
     const attachTrackToElement = (track: MediaStreamTrack | null, stream?: MediaStream | null) => {
-      console.log(`VideoTile [${participant.user_name}]: attachTrackToElement called`, {
+      logger.wall(`VideoTile [${participant.user_name}]: attachTrackToElement called`, {
         hasTrack: !!track,
         trackId: track?.id,
         trackReadyState: track?.readyState,
@@ -121,7 +123,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
       });
 
       if (!track) {
-        console.log(`VideoTile [${participant.user_name}]: No track to attach, cleaning up`);
+        logger.wall(`VideoTile [${participant.user_name}]: No track to attach, cleaning up`);
         cleanupStream();
         setHasVideo(false);
         return false;
@@ -131,14 +133,14 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
       streamRef.current = resolvedStream;
       lastTrackIdRef.current = track.id;
 
-      console.log(`VideoTile [${participant.user_name}]: Stream created, attaching to video element`);
+      logger.wall(`VideoTile [${participant.user_name}]: Stream created, attaching to video element`);
 
       if (videoRef.current) {
         videoRef.current.srcObject = resolvedStream;
-        console.log(`VideoTile [${participant.user_name}]: srcObject set, attempting playback`);
+        logger.wall(`VideoTile [${participant.user_name}]: srcObject set, attempting playback`);
         void attemptPlayback();
       } else {
-        console.warn(`VideoTile [${participant.user_name}]: Video element not available yet`);
+        logger.warn(`VideoTile [${participant.user_name}]: Video element not available yet`);
       }
 
       setHasVideo(true);
@@ -161,7 +163,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
         (latestParticipant.tracks?.video as { persistentTrack?: MediaStreamTrack })?.persistentTrack ??
         null;
 
-      console.log(`VideoTile [${participant.user_name}]: updateVideoTrack`, {
+      logger.wall(`VideoTile [${participant.user_name}]: updateVideoTrack`, {
         videoTrack: videoTrack?.id,
         readyState: videoTrack?.readyState,
         videoState,
@@ -174,7 +176,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
       const shouldSkip = !videoTrack || videoTrack.readyState === "ended";
 
       if (shouldSkip) {
-        console.log(`VideoTile [${participant.user_name}]: Skipping track update`, { 
+        logger.wall(`VideoTile [${participant.user_name}]: Skipping track update`, { 
           videoTrack: !!videoTrack, 
           readyState: videoTrack?.readyState, 
           videoState,
@@ -190,14 +192,14 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
       }
 
       if (lastTrackIdRef.current === videoTrack.id && videoRef.current?.srcObject) {
-        console.log(`VideoTile [${participant.user_name}]: Track already attached`);
+        logger.wall(`VideoTile [${participant.user_name}]: Track already attached`);
         setHasVideo(true);
         setIsLoading(false);
         setConnectionStatus('connected');
         return;
       }
 
-      console.log(`VideoTile [${participant.user_name}]: Attaching new track`, videoTrack.id, 'with state:', videoState);
+      logger.wall(`VideoTile [${participant.user_name}]: Attaching new track`, videoTrack.id, 'with state:', videoState);
       attachTrackToElement(videoTrack);
     };
 
@@ -205,7 +207,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
     loadingTimeout = setTimeout(() => {
       setIsLoading(false);
       setConnectionStatus('disconnected');
-    }, 10000); // 10 seconds
+    }, TIMEOUTS.VIDEO_LOADING_MS);
 
     // Initial update
     updateVideoTrack();
@@ -217,7 +219,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
     };
 
     const handleTrackStarted = (event: DailyEventObjectTrack) => {
-      console.log(`VideoTile [${participant.user_name}]: track-started event`, {
+      logger.wall(`VideoTile [${participant.user_name}]: track-started event`, {
         trackKind: event.track?.kind,
         participantId: event.participant?.session_id,
         matchesThisParticipant: event.participant?.session_id === participant.session_id,
@@ -232,7 +234,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
         const incomingTrack = event.track ?? null;
         const incomingStream = incomingTrack ? new MediaStream([incomingTrack]) : null;
 
-        console.log(`VideoTile [${participant.user_name}]: Received track-started for this participant`);
+        logger.wall(`VideoTile [${participant.user_name}]: Received track-started for this participant`);
         if (!attachTrackToElement(incomingTrack, incomingStream ?? undefined)) {
           handleRelevantChange(participantId);
         }
@@ -393,9 +395,9 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
         try {
           // @ts-expect-error - Daily.js types are not up to date
           await daily.updateReceiveSettings({ tracks: trackUpdates });
-          console.log("Wall: Forced subscription for", Object.keys(trackUpdates).length, "participant(s):", trackUpdates);
+          logger.wall("Wall: Forced subscription for", Object.keys(trackUpdates).length, "participant(s):", trackUpdates);
         } catch (subscriptionError) {
-          console.error("Wall: Failed to enforce subscriptions", subscriptionError);
+          logger.error("Wall: Failed to enforce subscriptions", subscriptionError);
         }
       }
     };
@@ -413,46 +415,46 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
         })
         .sort((a, b) => (a.user_name || "").localeCompare(b.user_name || ""));
 
-      console.log("Wall: Participants updated:", participantsList.length);
+      logger.wall("Wall: Participants updated:", participantsList.length);
       setParticipants(participantsList);
 
       void ensureSubscriptions(activeCall, participantsList);
     };
 
     const handleJoinedMeeting = () => {
-      console.log("Wall: Joined meeting successfully");
+      logger.wall("Wall: Joined meeting successfully");
       updateParticipants();
     };
 
     const handleParticipantJoined = () => {
-      console.log("Wall: Participant joined");
+      logger.wall("Wall: Participant joined");
       updateParticipants();
     };
 
     const handleParticipantUpdated = (event?: DailyEventObjectParticipant) => {
       if (event) {
-        console.log("Wall: Participant updated", event.participant?.user_name, "video:", event.participant?.video);
+        logger.wall("Wall: Participant updated", event.participant?.user_name, "video:", event.participant?.video);
       }
       updateParticipants();
     };
 
     const handleParticipantLeft = () => {
-      console.log("Wall: Participant left");
+      logger.wall("Wall: Participant left");
       updateParticipants();
     };
 
     const handleTrackStarted = (event: DailyEventObjectTrack) => {
-      console.log("Wall: Track started", event.participant?.user_name, event.track?.kind);
+      logger.wall("Wall: Track started", event.participant?.user_name, event.track?.kind);
       updateParticipants();
     };
 
     const handleTrackStopped = (event: DailyEventObjectTrack) => {
-      console.log("Wall: Track stopped", event.participant?.user_name, event.track?.kind);
+      logger.wall("Wall: Track stopped", event.participant?.user_name, event.track?.kind);
       updateParticipants();
     };
 
     const handleError = (error: { errorMsg: string; error?: Error }) => {
-      console.error("Wall: Daily.co error", error);
+      logger.error("Wall: Daily.co error", error);
     };
 
     const attachListeners = (daily: DailyCall) => {
@@ -478,22 +480,22 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
     const initializeCall = async () => {
       try {
         if (destroyPromiseRef.current) {
-          console.log("Wall: Waiting for previous Daily call cleanup to finish");
+          logger.wall("Wall: Waiting for previous Daily call cleanup to finish");
           await destroyPromiseRef.current;
         }
 
         if (!callObjectRef.current) {
           const existingInstance = DailyIframe.getCallInstance?.();
           if (existingInstance) {
-            console.log("Wall: Destroying leftover Daily call instance before creating new one");
+            logger.wall("Wall: Destroying leftover Daily call instance before creating new one");
             try {
               await existingInstance.destroy();
             } catch (destroyError) {
-              console.error("Wall: Failed to destroy leftover call instance", destroyError);
+              logger.error("Wall: Failed to destroy leftover call instance", destroyError);
             }
           }
 
-          console.log("Wall: Initializing Daily.co call...");
+          logger.wall("Wall: Initializing Daily.co call...");
           callObjectRef.current = DailyIframe.createCallObject({
             videoSource: false, // Wall doesn't publish video
             audioSource: false, // No audio
@@ -510,7 +512,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
         setCallObject(daily);
         attachListeners(daily);
 
-        console.log("Wall: Joining room", roomUrl);
+        logger.wall("Wall: Joining room", roomUrl);
         await daily.join({ url: roomUrl, token });
         
         // Set receive settings to request lowest quality layer
@@ -524,9 +526,9 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
           },
         });
         
-        console.log("Wall: Applied receive settings for low bandwidth");
+        logger.wall("Wall: Applied receive settings for low bandwidth");
       } catch (error) {
-        console.error("Wall: Failed to initialize call", error);
+        logger.error("Wall: Failed to initialize call", error);
       }
     };
 
@@ -537,13 +539,13 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
       if (activeCall && isMounted) {
         const currentParticipants = Object.values(activeCall.participants())
           .filter((p) => !p.local);
-        
+
         if (currentParticipants.length > 0) {
-          console.log("Wall: Periodic subscription check for", currentParticipants.length, "participants");
+          logger.wall("Wall: Periodic subscription check for", currentParticipants.length, "participants");
           void ensureSubscriptions(activeCall, currentParticipants);
         }
       }
-    }, 5000); // Check every 5 seconds
+    }, VIDEO_WALL.SUBSCRIPTION_CHECK_INTERVAL_MS);
 
     // Cleanup
     return () => {
@@ -553,9 +555,9 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
       const daily = callObjectRef.current;
       if (daily) {
         detachListeners(daily);
-        console.log("Wall: Cleaning up call object");
+        logger.wall("Wall: Cleaning up call object");
         const destroyPromise = daily.destroy().catch((err) => {
-          console.error("Wall: Error destroying call object", err);
+          logger.error("Wall: Error destroying call object", err);
         });
 
         destroyPromiseRef.current = destroyPromise;
@@ -573,12 +575,11 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
     };
   }, [roomUrl, token]);
 
-  const TILES_PER_PAGE = 20;
-  const totalPages = Math.ceil(participants.length / TILES_PER_PAGE);
+  const totalPages = Math.ceil(participants.length / VIDEO_WALL.TILES_PER_PAGE);
 
   const currentParticipants = useMemo(() => {
-    const startIdx = currentPage * TILES_PER_PAGE;
-    const endIdx = startIdx + TILES_PER_PAGE;
+    const startIdx = currentPage * VIDEO_WALL.TILES_PER_PAGE;
+    const endIdx = startIdx + VIDEO_WALL.TILES_PER_PAGE;
     return participants.slice(startIdx, endIdx);
   }, [participants, currentPage]);
 

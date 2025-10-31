@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Video, Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { VALIDATION } from "@/lib/constants";
+import { retryFetch } from "@/lib/retry";
 
 interface ChurchJoinFormProps {
   onJoined: (data: {
@@ -22,18 +24,19 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{sessionCode?: string; churchName?: string}>({});
   const [isValidating, setIsValidating] = useState(false);
+  const submittingRef = useRef(false);
 
   const validateSessionCode = (code: string) => {
     if (code.length === 0) return "";
-    if (code.length < 6) return "Service code must be 6 characters";
+    if (code.length < VALIDATION.SESSION_CODE_LENGTH) return `Service code must be ${VALIDATION.SESSION_CODE_LENGTH} characters`;
     if (!/^[A-Z0-9]+$/.test(code)) return "Service code can only contain letters and numbers";
     return "";
   };
 
   const validateChurchName = (name: string) => {
     if (name.length === 0) return "";
-    if (name.trim().length < 2) return "Church name must be at least 2 characters";
-    if (name.trim().length > 100) return "Church name must be less than 100 characters";
+    if (name.trim().length < VALIDATION.CHURCH_NAME_MIN_LENGTH) return `Church name must be at least ${VALIDATION.CHURCH_NAME_MIN_LENGTH} characters`;
+    if (name.trim().length > VALIDATION.CHURCH_NAME_MAX_LENGTH) return `Church name must be less than ${VALIDATION.CHURCH_NAME_MAX_LENGTH} characters`;
     return "";
   };
 
@@ -47,11 +50,18 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
     });
   }, [sessionCode, churchName]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Prevent double submission
+    if (submittingRef.current) {
+      return;
+    }
+
     setError("");
     setFieldErrors({});
     setLoading(true);
+    submittingRef.current = true;
 
     const sessionCodeError = validateSessionCode(sessionCode);
     const churchNameError = validateChurchName(churchName);
@@ -59,18 +69,27 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
     if (sessionCodeError || churchNameError) {
       setFieldErrors({ sessionCode: sessionCodeError, churchName: churchNameError });
       setLoading(false);
+      submittingRef.current = false;
       return;
     }
 
     try {
-      const joinResponse = await fetch("/api/session/join", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionCode: sessionCode.toUpperCase(),
-          churchName: churchName.trim(),
-        }),
-      });
+      // Use retry logic for joining session
+      const joinResponse = await retryFetch(
+        "/api/session/join",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionCode: sessionCode.toUpperCase(),
+            churchName: churchName.trim(),
+          }),
+        },
+        {
+          maxAttempts: 3,
+          initialDelayMs: 1000,
+        }
+      );
 
       if (!joinResponse.ok) {
         const data = await joinResponse.json();
@@ -82,15 +101,23 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
 
       const joinData = await joinResponse.json();
 
-      const tokenResponse = await fetch("/api/livekit/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionCode: sessionCode.toUpperCase(),
-          churchName: churchName.trim(),
-          participantType: "church",
-        }),
-      });
+      // Use retry logic for getting token
+      const tokenResponse = await retryFetch(
+        "/api/livekit/token",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionCode: sessionCode.toUpperCase(),
+            churchName: churchName.trim(),
+            participantType: "church",
+          }),
+        },
+        {
+          maxAttempts: 3,
+          initialDelayMs: 1000,
+        }
+      );
 
       if (!tokenResponse.ok) {
         const data = await tokenResponse.json();
@@ -106,13 +133,15 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
         serviceName: joinData.service.name,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to join");
+      setError(err instanceof Error ? err.message : "Failed to join. Please check your connection and try again.");
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
-  };
+  }, [sessionCode, churchName, onJoined]);
 
-  const isFormValid = sessionCode.length === 6 && churchName.trim().length >= 2 &&
+  const isFormValid = sessionCode.length === VALIDATION.SESSION_CODE_LENGTH &&
+                     churchName.trim().length >= VALIDATION.CHURCH_NAME_MIN_LENGTH &&
                      !fieldErrors.sessionCode && !fieldErrors.churchName && !loading;
 
   return (
@@ -146,20 +175,20 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
                 value={sessionCode}
                 onChange={(e) => {
                   setIsValidating(true);
-                  setSessionCode(e.target.value.toUpperCase().slice(0, 6));
+                  setSessionCode(e.target.value.toUpperCase().slice(0, VALIDATION.SESSION_CODE_LENGTH));
                 }}
-                maxLength={6}
+                maxLength={VALIDATION.SESSION_CODE_LENGTH}
                 required
                 aria-required="true"
                 aria-describedby="sessionCode-error sessionCode-help"
                 aria-invalid={!!fieldErrors.sessionCode}
                 className={`text-center text-lg sm:text-xl tracking-widest font-mono h-12 sm:h-auto pr-10 ${
                   fieldErrors.sessionCode ? 'border-red-500 focus:border-red-500' :
-                  sessionCode.length === 6 && !fieldErrors.sessionCode ? 'border-green-500 focus:border-green-500' : ''
+                  sessionCode.length === VALIDATION.SESSION_CODE_LENGTH && !fieldErrors.sessionCode ? 'border-green-500 focus:border-green-500' : ''
                 }`}
                 disabled={loading}
               />
-              {isValidating && sessionCode.length === 6 && !fieldErrors.sessionCode && (
+              {isValidating && sessionCode.length === VALIDATION.SESSION_CODE_LENGTH && !fieldErrors.sessionCode && (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2" aria-hidden="true">
                   <CheckCircle className="w-5 h-5 text-green-500" />
                 </div>
@@ -202,11 +231,11 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
                 aria-invalid={!!fieldErrors.churchName}
                 className={`text-base h-12 sm:h-auto pr-10 ${
                   fieldErrors.churchName ? 'border-red-500 focus:border-red-500' :
-                  churchName.trim().length >= 2 && !fieldErrors.churchName ? 'border-green-500 focus:border-green-500' : ''
+                  churchName.trim().length >= VALIDATION.CHURCH_NAME_MIN_LENGTH && !fieldErrors.churchName ? 'border-green-500 focus:border-green-500' : ''
                 }`}
                 disabled={loading}
               />
-              {isValidating && churchName.trim().length >= 2 && !fieldErrors.churchName && (
+              {isValidating && churchName.trim().length >= VALIDATION.CHURCH_NAME_MIN_LENGTH && !fieldErrors.churchName && (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2" aria-hidden="true">
                   <CheckCircle className="w-5 h-5 text-green-500" />
                 </div>

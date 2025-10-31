@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, lazy } from "react";
 import { ChurchJoinForm } from "@/components/church/church-join-form";
-import { ChurchRoom } from "@/components/church/church-room-daily";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { ChurchJoinSkeleton } from "@/components/ui/skeletons";
+import { PageLoadingSpinner } from "@/components/ui/loading-spinner";
+
+// Lazy load the heavy ChurchRoom component (includes Daily.co video)
+const ChurchRoom = lazy(() =>
+  import("@/components/church/church-room-daily").then((mod) => ({
+    default: mod.ChurchRoom,
+  }))
+);
 
 export default function ChurchPage() {
   const [token, setToken] = useState<string | null>(null);
@@ -48,13 +55,15 @@ export default function ChurchPage() {
           </div>
         </Suspense>
       ) : (
-        <ChurchRoom
-          token={token}
-          roomUrl={roomUrl!}
-          churchName={churchName!}
-          serviceName={serviceName!}
-          onLeave={handleLeave}
-        />
+        <Suspense fallback={<PageLoadingSpinner message="Loading video room..." />}>
+          <ChurchRoom
+            token={token || ""}
+            roomUrl={roomUrl || ""}
+            churchName={churchName || ""}
+            serviceName={serviceName || ""}
+            onLeave={handleLeave}
+          />
+        </Suspense>
       )}
     </div>
   );

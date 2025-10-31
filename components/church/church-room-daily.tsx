@@ -5,6 +5,8 @@ import DailyIframe, { DailyCall, DailyEventObjectParticipant } from "@daily-co/d
 import { Button } from "@/components/ui/button";
 import { Video, VideoOff, PhoneOff, Signal, RefreshCw } from "lucide-react";
 import { analytics } from "@/lib/analytics";
+import { logger } from "@/lib/logger";
+import { VIDEO_QUALITY, TIMEOUTS } from "@/lib/constants";
 
 interface ChurchRoomProps {
   token: string;
@@ -36,25 +38,19 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
 
   // Helper function to get optimal video constraints based on network
   const getOptimalVideoConstraints = useCallback(() => {
-    type VideoConstraintProfile = {
-      width: number;
-      height: number;
-      frameRate: number;
-    };
-
     const navigatorWithConnection = navigator as Navigator & {
       connection?: { effectiveType?: string };
     };
     const effectiveType = navigatorWithConnection.connection?.effectiveType ?? "4g";
 
-    const profiles: Record<string, VideoConstraintProfile> = {
-      "slow-2g": { width: 120, height: 90, frameRate: 4 },
-      "2g": { width: 160, height: 120, frameRate: 6 },
-      "3g": { width: 240, height: 180, frameRate: 8 },
-      "4g": { width: 320, height: 240, frameRate: 12 },
+    const profileMap: Record<string, typeof VIDEO_QUALITY.PROFILES[keyof typeof VIDEO_QUALITY.PROFILES]> = {
+      "slow-2g": VIDEO_QUALITY.PROFILES.SLOW_2G,
+      "2g": VIDEO_QUALITY.PROFILES["2G"],
+      "3g": VIDEO_QUALITY.PROFILES["3G"],
+      "4g": VIDEO_QUALITY.PROFILES["4G"],
     };
 
-    return profiles[effectiveType] ?? profiles["3g"];
+    return profileMap[effectiveType] ?? VIDEO_QUALITY.PROFILES["3G"];
   }, []);
 
   // Initialize Daily.co call
@@ -68,7 +64,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       if (!isMounted) {
         return;
       }
-      console.log("Church: Joined meeting successfully");
+      logger.church("Joined meeting successfully");
       setIsJoined(true);
       joinTimeRef.current = Date.now();
       analytics.trackChurchJoin(serviceName, churchName, true);
@@ -78,7 +74,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       if (!isMounted) {
         return;
       }
-      console.log("Church: Left meeting");
+      logger.church("Left meeting");
       setIsJoined(false);
       const duration = Date.now() - joinTimeRef.current;
       analytics.trackChurchLeave(serviceName, churchName, duration);
@@ -89,7 +85,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       if (!isMounted || !event.participant.local) {
         return;
       }
-      console.log("Church: Local participant updated", event.participant);
+      logger.church("Local participant updated", event.participant);
       setIsCameraEnabled(event.participant.video || false);
     };
 
@@ -97,7 +93,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       if (!isMounted || !callObjectRef.current) {
         return;
       }
-      console.log("Church: Network quality", event.quality);
+      logger.church("Network quality", event.quality);
       const quality = event.quality >= 80 ? "good" : event.quality >= 50 ? "low" : "very-low";
       setConnectionQuality(quality);
 
@@ -111,7 +107,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
           timestamp: Date.now()
         };
         setBandwidthMetrics(metrics);
-        
+
         // Track connection quality analytics
         analytics.trackConnectionQuality(
           quality,
@@ -121,15 +117,15 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       }
 
       // Dynamically adjust video quality based on network conditions
-      if (event.quality < 50 && callObjectRef.current) {
-        console.log("Church: Poor network detected, reducing quality");
+      if (event.quality < VIDEO_QUALITY.LOW_QUALITY_THRESHOLD && callObjectRef.current) {
+        logger.church("Poor network detected, reducing quality");
         try {
           await callObjectRef.current.updateSendSettings({
             video: {
               maxQuality: "low",
               encodings: {
                 low: {
-                  maxBitrate: 150000, // Further reduce bitrate
+                  maxBitrate: VIDEO_QUALITY.POOR_NETWORK_BITRATE,
                   maxFramerate: 4,
                   scaleResolutionDownBy: 3,
                 },
@@ -137,16 +133,16 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
             },
           });
         } catch (error) {
-          console.log("Church: Failed to adjust quality", error);
+          logger.church("Failed to adjust quality", error);
         }
       }
     };
 
     const handleError = (error: { errorMsg: string; error?: Error }) => {
-      console.error("Church: Daily.co error", error);
+      logger.error("Church: Daily.co error", error);
       const errorMessage = error.errorMsg || "Connection error occurred";
       setConnectionError(errorMessage);
-      
+
       // Track video errors for analytics
       analytics.trackVideoError(errorMessage, 'church_room');
 
@@ -156,7 +152,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
         setTimeout(() => {
           setReconnecting(false);
           setConnectionError("");
-        }, 5000);
+        }, TIMEOUTS.RECONNECTION_DELAY_MS);
       }
     };
 
@@ -187,7 +183,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       let acquiredStream: MediaStream | null = null;
       try {
         if (destroyPromiseRef.current) {
-          console.log("Church: Waiting for previous Daily call cleanup to finish");
+          logger.church("Waiting for previous Daily call cleanup to finish");
           await destroyPromiseRef.current;
         }
 
@@ -200,16 +196,16 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
         if (!callObjectRef.current) {
           const existingInstance = DailyIframe.getCallInstance?.();
           if (existingInstance) {
-            console.log("Church: Destroying leftover Daily call instance before creating new one");
+            logger.church("Destroying leftover Daily call instance before creating new one");
             try {
               await existingInstance.destroy();
             } catch (destroyError) {
-              console.error("Church: Failed to destroy leftover call instance", destroyError);
+              logger.error("Church: Failed to destroy leftover call instance", destroyError);
             }
           }
 
-          console.log("Church: Initializing Daily.co call...");
-          console.log("Church: Using video constraints", videoConstraints);
+          logger.church("Initializing Daily.co call...");
+          logger.church("Using video constraints", videoConstraints);
 
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
@@ -246,7 +242,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
         setCallObject(daily);
         attachListeners(daily);
 
-        console.log("Church: Joining room", roomUrl);
+        logger.church("Joining room", roomUrl);
         await daily.join({
           url: roomUrl,
           token,
@@ -268,7 +264,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
             maxQuality: "low" as const,
             encodings: {
               low: {
-                maxBitrate: videoConstraints.width <= 160 ? 200000 : 400000, // Adaptive bitrate
+                maxBitrate: videoConstraints.bitrate,
                 maxFramerate: videoConstraints.frameRate,
                 scaleResolutionDownBy: videoConstraints.width >= 320 ? 1 : 2,
               },
@@ -278,13 +274,13 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
 
         await daily.updateSendSettings(sendSettings);
 
-        console.log("Church: Camera enabled with adaptive settings", {
+        logger.church("Camera enabled with adaptive settings", {
           resolution: `${videoConstraints.width}x${videoConstraints.height}`,
           frameRate: videoConstraints.frameRate,
           maxBitrate: sendSettings.video.encodings.low.maxBitrate
         });
       } catch (error) {
-        console.error("Church: Failed to initialize call", error);
+        logger.error("Church: Failed to initialize call", error);
         stopStreamTracks(acquiredStream);
       }
     };
@@ -301,9 +297,9 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       const daily = callObjectRef.current;
       if (daily) {
         detachListeners(daily);
-        console.log("Church: Cleaning up call object");
+        logger.church("Cleaning up call object");
         const destroyPromise = daily.destroy().catch((err) => {
-          console.error("Church: Error destroying call object", err);
+          logger.error("Church: Error destroying call object", err);
         });
 
         destroyPromiseRef.current = destroyPromise;
@@ -334,10 +330,10 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
     if (callObject && videoRef.current && isJoined) {
       const updateVideo = () => {
         const localParticipant = callObject.participants().local;
-        if (localParticipant?.tracks?.video?.track) {
-          console.log("Church: Attaching video track");
+        if (localParticipant?.tracks?.video?.track && videoRef.current) {
+          logger.church("Attaching video track");
           const stream = new MediaStream([localParticipant.tracks.video.track]);
-          videoRef.current!.srcObject = stream;
+          videoRef.current.srcObject = stream;
         }
       };
 
@@ -362,26 +358,26 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
 
   const toggleVideo = useCallback(async () => {
     if (!callObject) return;
-    
+
     try {
       const newState = !isCameraEnabled;
       await callObject.setLocalVideo(newState);
       setIsCameraEnabled(newState);
-      console.log("Church: Video toggled to", newState);
+      logger.church("Video toggled to", newState);
     } catch (error) {
-      console.error("Church: Failed to toggle video", error);
+      logger.error("Church: Failed to toggle video", error);
       setConnectionError("Failed to toggle video");
     }
   }, [callObject, isCameraEnabled]);
 
   const switchCamera = useCallback(async () => {
     if (!callObject || isSwitchingCamera) return;
-    
+
     setIsSwitchingCamera(true);
     try {
       const newFacingMode = facingMode === "user" ? "environment" : "user";
       const videoConstraints = getOptimalVideoConstraints();
-      
+
       // Get new video stream with different camera
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -400,10 +396,10 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
           videoSource: videoTrack,
         });
         setFacingMode(newFacingMode);
-        console.log("Church: Camera switched to", newFacingMode);
+        logger.church("Camera switched to", newFacingMode);
       }
     } catch (error) {
-      console.error("Church: Failed to switch camera", error);
+      logger.error("Church: Failed to switch camera", error);
       setConnectionError("Failed to switch camera");
     } finally {
       setIsSwitchingCamera(false);
@@ -434,16 +430,23 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-4">
-            <div className="hidden items-center gap-2 rounded-lg bg-white/10 px-3 py-2 sm:flex">
-              <Signal className={`h-4 w-4 ${getConnectionQualityColor()}`} />
-              <span className="text-sm text-white capitalize">
-                {connectionQuality === "very-low" ? "Poor" : connectionQuality}
-              </span>
-              {bandwidthMetrics.upload > 0 && (
-                <span className="text-xs text-gray-300 ml-1">
-                  {Math.round(bandwidthMetrics.upload / 1000)}kbps
+            {/* Prominent Connection Status - Always visible */}
+            <div className={`flex items-center gap-2 rounded-lg px-4 py-2 ${
+              connectionQuality === "good" ? "bg-green-500/20 border border-green-500/40" :
+              connectionQuality === "low" ? "bg-yellow-500/20 border border-yellow-500/40" :
+              "bg-red-500/20 border border-red-500/40"
+            }`}>
+              <Signal className={`h-5 w-5 ${getConnectionQualityColor()}`} />
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-white capitalize">
+                  {connectionQuality === "very-low" ? "Poor" : connectionQuality}
                 </span>
-              )}
+                {bandwidthMetrics.upload > 0 && (
+                  <span className="text-xs text-gray-300">
+                    {Math.round(bandwidthMetrics.upload / 1000)}kbps
+                  </span>
+                )}
+              </div>
             </div>
 
             <Button
@@ -491,20 +494,6 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
               <span className="hidden sm:inline">Leave Service</span>
               <span className="sm:hidden">Leave</span>
             </Button>
-          </div>
-        </div>
-
-        <div className="mx-auto mt-2 flex w-full max-w-5xl justify-start px-3 sm:hidden">
-          <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1">
-            <Signal className={`h-3 w-3 ${getConnectionQualityColor()}`} />
-            <span className="text-xs text-white capitalize">
-              {connectionQuality === "very-low" ? "Poor" : connectionQuality}
-            </span>
-            {bandwidthMetrics.upload > 0 && (
-              <span className="text-xs text-gray-300 ml-1">
-                {Math.round(bandwidthMetrics.upload / 1000)}kbps
-              </span>
-            )}
           </div>
         </div>
       </header>

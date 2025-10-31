@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,10 +12,12 @@ import {
   Users,
   Wifi,
   WifiOff,
+  Radio,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useSSE } from "@/lib/hooks/use-sse";
 
 interface DashboardStats {
   totalChurches: number;
@@ -44,52 +46,57 @@ type DashboardStatsResponse = Omit<DashboardStats, "recentActivity"> & {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [stats, setStats] = useState<DashboardStats>({
-    totalChurches: 0,
-    activeServices: 0,
-    totalSessions: 0,
-    activeConnections: 0,
-    recentActivity: [],
-    bandwidthUsage: {
-      total: 0,
-      average: 0
-    }
-  });
-  const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  const fetchStats = async () => {
-    try {
-      const response = await fetch("/api/admin/dashboard/stats", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" }
-      });
-
-      if (response.ok) {
-        const data: DashboardStatsResponse = await response.json();
-        setStats({
-          ...data,
-          recentActivity: data.recentActivity?.map((activity) => ({
-            ...activity,
-            timestamp: new Date(activity.timestamp)
-          })) || []
-        });
-        setLastUpdate(new Date());
+  // Use Server-Sent Events for real-time updates (replaces polling)
+  const { data: sseStats, isConnected } = useSSE<DashboardStatsResponse>({
+    url: "/api/admin/dashboard/stream",
+    initialData: {
+      totalChurches: 0,
+      activeServices: 0,
+      totalSessions: 0,
+      activeConnections: 0,
+      recentActivity: [],
+      bandwidthUsage: {
+        total: 0,
+        average: 0
       }
-    } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
-    } finally {
-      setLoading(false);
+    },
+  });
+
+  // Transform SSE data to match component format
+  const stats = useMemo<DashboardStats>(() => {
+    if (!sseStats) {
+      return {
+        totalChurches: 0,
+        activeServices: 0,
+        totalSessions: 0,
+        activeConnections: 0,
+        recentActivity: [],
+        bandwidthUsage: {
+          total: 0,
+          average: 0
+        }
+      };
     }
-  };
 
+    return {
+      ...sseStats,
+      recentActivity: sseStats.recentActivity?.map((activity) => ({
+        ...activity,
+        timestamp: new Date(activity.timestamp)
+      })) || []
+    };
+  }, [sseStats]);
+
+  // Update lastUpdate timestamp when data changes
   useEffect(() => {
-    fetchStats();
+    if (sseStats) {
+      setLastUpdate(new Date());
+    }
+  }, [sseStats]);
 
-    const interval = setInterval(fetchStats, 30000); // Update every 30 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+  const loading = !sseStats;
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -160,9 +167,20 @@ export default function AdminDashboard() {
               Control Center
             </p>
             <h1 className="text-2xl font-semibold text-slate-900">Admin Dashboard</h1>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-500 flex items-center gap-2">
               Last updated at {lastUpdate ? lastUpdate.toLocaleTimeString() : "—"}
-              {loading && <span className="ml-2 inline-flex items-center text-xs text-blue-600">• Updating</span>}
+              {loading && <span className="inline-flex items-center text-xs text-blue-600">• Updating</span>}
+              {!loading && (
+                <span className={cn(
+                  "inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full",
+                  isConnected
+                    ? "bg-green-100 text-green-700"
+                    : "bg-gray-100 text-gray-600"
+                )}>
+                  <Radio className={cn("h-3 w-3", isConnected && "animate-pulse")} />
+                  {isConnected ? "Live" : "Offline"}
+                </span>
+              )}
             </p>
           </div>
           <Button onClick={handleLogout} variant="outline" className="self-start gap-2">
