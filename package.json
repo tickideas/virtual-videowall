@@ -7,6 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "analyze": "ANALYZE=true next build",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
@@ -16,33 +20,38 @@
     "seed": "node prisma/seed.mjs"
   },
   "dependencies": {
-    "@daily-co/daily-js": "^0.84.0",
-    "@daily-co/daily-react": "^0.23.2",
+    "@daily-co/daily-js": "^0.85.0",
     "@prisma/client": "^6.16.3",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
-    "lucide-react": "^0.454.0",
+    "ioredis": "^5.9.1",
+    "lucide-react": "^0.562.0",
     "next": "^16.0.1",
-    "next-auth": "^4.24.13",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "tailwind-merge": "^2.5.4",
-    "zod": "^3.23.8"
+    "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.1.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.1",
     "@types/bcryptjs": "^2.4.6",
-    "@types/node": "^22.8.6",
+    "@types/ioredis": "^4.28.10",
+    "@types/node": "^25.0.6",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^5.1.2",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.15.0",
     "eslint-config-next": "^16.0.1",
+    "happy-dom": "^20.1.0",
     "postcss": "^8.4.47",
     "prisma": "^6.16.3",
     "tailwindcss": "^3.4.14",
-    "tsx": "^4.19.2",
-    "typescript": "^5.6.3"
+    "tsx": "^4.21.0",
+    "typescript": "^5.6.3",
+    "vitest": "^4.0.17"
   }
 }

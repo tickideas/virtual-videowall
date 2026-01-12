@@ -63,3 +63,17 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  event      String
+  properties Json?
+  sessionId  String?
+  userAgent  String?
+  url        String?
+  createdAt  DateTime @default(now())
+
+  @@index([event])
+  @@index([sessionId])
+  @@index([createdAt])
+}

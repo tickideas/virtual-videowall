@@ -1,3 +1,6 @@
+import { prisma } from './prisma';
+import { logger } from './logger';
+
 interface AnalyticsEvent {
   event: string;
   properties?: Record<string, unknown>;
@@ -8,10 +11,12 @@ class Analytics {
   private events: AnalyticsEvent[] = [];
   private sessionId: string;
   private isEnabled: boolean;
+  private isServer: boolean;
 
   constructor() {
     this.sessionId = this.generateSessionId();
     this.isEnabled = process.env.NODE_ENV === 'production';
+    this.isServer = typeof window === 'undefined';
   }
 
   private generateSessionId(): string {
@@ -40,8 +45,15 @@ class Analytics {
   }
 
   private sendToExternal(event: AnalyticsEvent) {
-    // In a real implementation, this would send to Google Analytics, Mixpanel, etc.
-    // For now, we'll store in localStorage and send in batches
+    // Server-side: persist to database
+    if (this.isServer) {
+      this.persistToDatabase(event).catch((error) => {
+        logger.error('Failed to persist analytics event:', error);
+      });
+      return;
+    }
+
+    // Client-side: store in localStorage and optionally send to server
     if (typeof window !== 'undefined') {
       try {
         const existing = JSON.parse(localStorage.getItem('analytics_events') || '[]');
@@ -61,12 +73,52 @@ class Analytics {
         if (recentEvents.length < existing.length) {
           localStorage.setItem('analytics_events', JSON.stringify(recentEvents));
         }
+
+        // Optionally send to server API endpoint
+        this.sendToServer(event).catch((error) => {
+          // Silent fail for client-side analytics
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Failed to send analytics event to server:', error);
+          }
+        });
       } catch (error) {
         // Silent fail in production, only log critical errors
         if (process.env.NODE_ENV === 'development') {
           console.warn('Failed to store analytics event:', error);
         }
       }
+    }
+  }
+
+  private async persistToDatabase(event: AnalyticsEvent): Promise<void> {
+    try {
+      await prisma.analyticsEvent.create({
+        data: {
+          event: event.event,
+          properties: (event.properties || {}) as any,
+          sessionId: this.sessionId,
+          userAgent: event.properties?.userAgent as string | undefined,
+          url: event.properties?.url as string | undefined,
+        },
+      });
+    } catch (error) {
+      logger.error('Database persistence error:', error);
+      throw error;
+    }
+  }
+
+  private async sendToServer(event: AnalyticsEvent): Promise<void> {
+    try {
+      await fetch('/api/analytics', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(event),
+      });
+    } catch (error) {
+      // Silent fail for client-side analytics
+      throw error;
     }
   }
 
