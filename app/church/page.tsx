@@ -1,57 +1,94 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense, lazy } from "react";
 import { ChurchJoinForm } from "@/components/church/church-join-form";
-import { ChurchRoom } from "@/components/church/church-room";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { Grid3x3 } from "lucide-react";
+import { ChurchJoinSkeleton } from "@/components/ui/skeletons";
+import { PageLoadingSpinner } from "@/components/ui/loading-spinner";
+
+// Lazy load the heavy ChurchRoom component (includes Daily.co video)
+const ChurchRoom = lazy(() =>
+  import("@/components/church/church-room-daily").then((mod) => ({
+    default: mod.ChurchRoom,
+  }))
+);
 
 export default function ChurchPage() {
   const [token, setToken] = useState<string | null>(null);
-  const [roomName, setRoomName] = useState<string | null>(null);
+  const [roomUrl, setRoomUrl] = useState<string | null>(null);
   const [churchName, setChurchName] = useState<string | null>(null);
   const [serviceName, setServiceName] = useState<string | null>(null);
 
   const handleJoined = (data: {
     token: string;
-    roomName: string;
+    roomUrl: string;
     churchName: string;
     serviceName: string;
   }) => {
     setToken(data.token);
-    setRoomName(data.roomName);
+    setRoomUrl(data.roomUrl);
     setChurchName(data.churchName);
     setServiceName(data.serviceName);
   };
 
   const handleLeave = () => {
     setToken(null);
-    setRoomName(null);
+    setRoomUrl(null);
     setChurchName(null);
     setServiceName(null);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
       {!token ? (
-        <div className="container mx-auto px-4 py-8">
-          <Link
-            href="/"
-            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-8"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Link>
-          <ChurchJoinForm onJoined={handleJoined} />
-        </div>
+        <Suspense fallback={<ChurchJoinSkeleton />}>
+          {/* Header */}
+          <header className="bg-white border-b border-slate-200 shadow-sm">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between h-16">
+               
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
+                    <Grid3x3 className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="text-lg font-bold text-slate-900">UKZ1 VideoWall</span>
+                </div>
+                <div className="w-20"></div> {/* Spacer for centering */}
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content */}
+          <div className="py-8 lg:py-12">
+            <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+             
+              {/* Join Form */}
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6">
+                  <h2 className="text-2xl font-bold text-white mb-2">
+                    Connect to the Zonal Video Wall
+                  </h2>
+              
+                </div>
+                <div className="p-8">
+                  <ChurchJoinForm onJoined={handleJoined} />
+                </div>
+              </div>
+
+          
+            </div>
+          </div>
+        </Suspense>
       ) : (
-        <ChurchRoom
-          token={token}
-          roomName={roomName!}
-          churchName={churchName!}
-          serviceName={serviceName!}
-          onLeave={handleLeave}
-        />
+        <Suspense fallback={<PageLoadingSpinner message="Loading video room..." />}>
+          <ChurchRoom
+            token={token || ""}
+            roomUrl={roomUrl || ""}
+            churchName={churchName || ""}
+            serviceName={serviceName || ""}
+            onLeave={handleLeave}
+          />
+        </Suspense>
       )}
     </div>
   );

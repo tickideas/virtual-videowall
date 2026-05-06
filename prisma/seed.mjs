@@ -1,5 +1,7 @@
+// @ts-check
 import { PrismaClient } from "@prisma/client";
-import { hash } from "bcryptjs";
+import pkg from 'bcryptjs';
+const { hash } = pkg;
 
 const prisma = new PrismaClient();
 
@@ -29,7 +31,6 @@ async function main() {
 
     console.log(`✅ Created admin user: ${admin.email}`);
     console.log(`📧 Email: ${adminEmail}`);
-    console.log(`🔑 Password: ${adminPassword}`);
     console.log("⚠️  CHANGE THIS PASSWORD AFTER FIRST LOGIN!");
   }
 

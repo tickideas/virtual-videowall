@@ -17,6 +17,7 @@ model Church {
   sessions  Session[]
 
   @@index([code])
+  @@index([name])
 }
 
 model Service {
@@ -49,6 +50,8 @@ model Session {
 
   @@index([serviceId, isActive])
   @@index([churchId])
+  @@index([joinedAt])
+  @@index([joinedAt, leftAt])
 }
 
 model User {
@@ -59,4 +62,18 @@ model User {
   role      String   @default("admin")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  event      String
+  properties Json?
+  sessionId  String?
+  userAgent  String?
+  url        String?
+  createdAt  DateTime @default(now())
+
+  @@index([event])
+  @@index([sessionId])
+  @@index([createdAt])
 }

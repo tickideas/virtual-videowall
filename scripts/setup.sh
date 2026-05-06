@@ -27,28 +27,22 @@ if [ ! -f .env ]; then
     # Generate secrets
     echo "🔐 Generating secure secrets..."
     NEXTAUTH_SECRET=$(openssl rand -base64 32)
-    LIVEKIT_API_KEY="LK$(openssl rand -hex 8)"
-    LIVEKIT_API_SECRET=$(openssl rand -base64 32)
     
     # Update .env file
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS
         sed -i '' "s|NEXTAUTH_SECRET=\"generate-with-openssl-rand-base64-32\"|NEXTAUTH_SECRET=\"$NEXTAUTH_SECRET\"|g" .env
-        sed -i '' "s|LIVEKIT_API_KEY=\"devkey\"|LIVEKIT_API_KEY=\"$LIVEKIT_API_KEY\"|g" .env
-        sed -i '' "s|LIVEKIT_API_SECRET=\"secret\"|LIVEKIT_API_SECRET=\"$LIVEKIT_API_SECRET\"|g" .env
     else
         # Linux
         sed -i "s|NEXTAUTH_SECRET=\"generate-with-openssl-rand-base64-32\"|NEXTAUTH_SECRET=\"$NEXTAUTH_SECRET\"|g" .env
-        sed -i "s|LIVEKIT_API_KEY=\"devkey\"|LIVEKIT_API_KEY=\"$LIVEKIT_API_KEY\"|g" .env
-        sed -i "s|LIVEKIT_API_SECRET=\"secret\"|LIVEKIT_API_SECRET=\"$LIVEKIT_API_SECRET\"|g" .env
     fi
     
     echo "✅ .env file created with secure secrets"
     echo ""
     echo "⚠️  IMPORTANT: Update these values in .env:"
     echo "   - DATABASE_URL (if not using Docker Compose)"
-    echo "   - LIVEKIT_URL (if not using Docker Compose)"
-    echo "   - NEXT_PUBLIC_LIVEKIT_URL (must be publicly accessible)"
+    echo "   - DAILY_API_KEY"
+    echo "   - DAILY_DOMAIN and NEXT_PUBLIC_DAILY_DOMAIN"
     echo ""
     read -p "Press enter to continue..."
 else
@@ -83,8 +77,8 @@ echo ""
 echo "🎉 Setup completed!"
 echo ""
 echo "📋 Next steps:"
-echo "   1. Start Docker Compose (PostgreSQL + LiveKit):"
-echo "      docker-compose up -d"
+echo "   1. Start Docker Compose services (PostgreSQL + Redis):"
+echo "      docker compose up -d postgres redis"
 echo ""
 echo "   2. Start development server:"
 echo "      npm run dev"

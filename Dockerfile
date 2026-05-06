@@ -29,6 +29,12 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+
+# Copy node_modules needed for seeding.
+# The standalone build includes minimal dependencies, but the seed script needs bcryptjs.
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/bcryptjs ./node_modules/bcryptjs
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/@types ./node_modules/@types
 
 USER nextjs
 

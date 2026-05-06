@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateSessionCode } from "@/lib/utils";
+import { serverAnalytics } from "@/lib/server-analytics";
 
 export async function GET() {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const churches = await prisma.church.findMany({
       orderBy: { name: "asc" },
@@ -24,6 +31,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { name, location } = body;
@@ -51,11 +63,68 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    void serverAnalytics.trackChurchCreated(name, code);
+
     return NextResponse.json({ church });
   } catch (error) {
     console.error("Error creating church:", error);
     return NextResponse.json(
       { error: "Failed to create church" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Church ID is required" },
+        { status: 400 }
+      );
+    }
+
+    // Check if church has any sessions
+    const churchWithSessions = await prisma.church.findFirst({
+      where: { id },
+      include: {
+        _count: {
+          select: { sessions: true }
+        }
+      }
+    });
+
+    if (!churchWithSessions) {
+      return NextResponse.json(
+        { error: "Church not found" },
+        { status: 404 }
+      );
+    }
+
+    if (churchWithSessions._count.sessions > 0) {
+      return NextResponse.json(
+        { error: "Cannot delete church with existing sessions. Please delete sessions first." },
+        { status: 400 }
+      );
+    }
+
+    await prisma.church.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting church:", error);
+    return NextResponse.json(
+      { error: "Failed to delete church" },
       { status: 500 }
     );
   }

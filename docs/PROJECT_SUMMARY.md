@@ -106,7 +106,7 @@ With proper indexes for performance and relationships.
 ### 🔧 Scripts & Utilities
 
 - ✅ `scripts/setup.sh` - Automated setup script
-- ✅ `prisma/seed.ts` - Database seeding with admin user
+- ✅ `prisma/seed.mjs` - Database seeding with admin user
 - ✅ `lib/utils.ts` - Helper functions
 - ✅ `lib/livekit.ts` - LiveKit utilities
 - ✅ `lib/prisma.ts` - Database client

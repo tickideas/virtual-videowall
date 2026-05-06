@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateSessionCode } from "@/lib/utils";
+import { serverAnalytics } from "@/lib/server-analytics";
 
 export async function GET() {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const services = await prisma.service.findMany({
       orderBy: { startTime: "desc" },
@@ -24,6 +31,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { name, startTime, maxChurches = 60 } = body;
@@ -52,6 +64,8 @@ export async function POST(request: NextRequest) {
         active: true,
       },
     });
+
+    void serverAnalytics.trackServiceCreated(name, maxChurches);
 
     return NextResponse.json({ service });
   } catch (error) {
