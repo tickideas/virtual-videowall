@@ -4,12 +4,21 @@
  */
 
 import { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const session = await auth();
+  const role = session?.user?.role?.toLowerCase();
+
+  if (!session?.user || role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   // Set up SSE headers
   const headers = new Headers({
     "Content-Type": "text/event-stream",
@@ -44,7 +53,8 @@ export async function GET(request: NextRequest) {
             prisma.session.count(),
             prisma.session.findMany({
               where: { isActive: true },
-              include: { church: true },
+              include: { church: true, service: true },
+              orderBy: { joinedAt: "desc" },
             }),
             prisma.session.findMany({
               take: 5,
@@ -72,6 +82,20 @@ export async function GET(request: NextRequest) {
             activeServices,
             totalSessions,
             activeConnections: activeSessions.length,
+            connections: activeSessions.map((session) => ({
+              id: session.id,
+              churchName: session.church.name,
+              serviceName: session.service.name,
+              avgBandwidth: session.avgBandwidth,
+              connectionQuality: session.connectionQuality,
+              lastHealthAt: session.lastHealthAt?.toISOString() ?? null,
+              lastStatus: session.lastStatus,
+              videoStatus: session.videoStatus,
+              cameraEnabled: session.cameraEnabled,
+              packetLoss: session.packetLoss,
+              reconnectCount: session.reconnectCount,
+              joinedAt: session.joinedAt.toISOString(),
+            })),
             recentActivity: recentActivity.map((activity) => {
               const type = activity.isActive
                 ? "church_joined"

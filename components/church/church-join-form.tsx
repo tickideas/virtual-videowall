@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Video, Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { Video, Loader2, AlertCircle, CheckCircle, Camera, Wifi } from "lucide-react";
 import { VALIDATION } from "@/lib/constants";
 import { retryFetch } from "@/lib/retry";
 
 interface ChurchJoinFormProps {
   onJoined: (data: {
+    sessionId: string;
+    healthToken: string;
     token: string;
     roomUrl: string;
     churchName: string;
@@ -17,17 +19,30 @@ interface ChurchJoinFormProps {
   }) => void;
 }
 
+type ReadinessStatus = "idle" | "checking" | "pass" | "warning" | "fail";
+
+interface ReadinessCheck {
+  status: ReadinessStatus;
+  camera: string;
+  network: string;
+  details: string;
+}
+
 export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
   const [sessionCode, setSessionCode] = useState("");
   const [churchName, setChurchName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<{
-    sessionCode?: string;
-    churchName?: string;
-  }>({});
   const [isValidating, setIsValidating] = useState(false);
+  const [readiness, setReadiness] = useState<ReadinessCheck>({
+    status: "idle",
+    camera: "Not checked",
+    network: "Not checked",
+    details: "Run a quick camera and network check before joining.",
+  });
   const submittingRef = useRef(false);
+  const previewRef = useRef<HTMLVideoElement>(null);
+  const previewStreamRef = useRef<MediaStream | null>(null);
 
   const validateSessionCode = (code: string) => {
     if (code.length === 0) return "";
@@ -47,15 +62,88 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
     return "";
   };
 
-  useEffect(() => {
-    const sessionCodeError = validateSessionCode(sessionCode);
-    const churchNameError = validateChurchName(churchName);
+  const fieldErrors = useMemo(
+    () => ({
+      sessionCode: validateSessionCode(sessionCode),
+      churchName: validateChurchName(churchName),
+    }),
+    [sessionCode, churchName],
+  );
 
-    setFieldErrors({
-      sessionCode: sessionCodeError,
-      churchName: churchNameError,
+  useEffect(() => {
+    return () => {
+      previewStreamRef.current?.getTracks().forEach((track) => track.stop());
+      previewStreamRef.current = null;
+    };
+  }, []);
+
+  const runReadinessCheck = useCallback(async () => {
+    setReadiness({
+      status: "checking",
+      camera: "Checking camera",
+      network: "Checking network",
+      details: "Allow camera access when prompted.",
     });
-  }, [sessionCode, churchName]);
+
+    let cameraOk = false;
+    let cameraLabel = "Camera unavailable";
+    let networkLabel = "Network unknown";
+    let warning = "";
+
+    try {
+      previewStreamRef.current?.getTracks().forEach((track) => track.stop());
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 240 },
+          height: { ideal: 180 },
+          frameRate: { ideal: 8, max: 8 },
+        },
+        audio: false,
+      });
+
+      previewStreamRef.current = stream;
+      if (previewRef.current) {
+        previewRef.current.srcObject = stream;
+      }
+
+      const videoTrack = stream.getVideoTracks()[0];
+      const settings = videoTrack?.getSettings();
+      cameraOk = Boolean(videoTrack);
+      cameraLabel = settings?.width && settings?.height
+        ? `Ready at ${settings.width}x${settings.height}`
+        : "Camera ready";
+    } catch (error) {
+      cameraLabel = error instanceof Error ? error.message : "Camera permission failed";
+    }
+
+    const connection = (navigator as Navigator & {
+      connection?: { effectiveType?: string; downlink?: number; rtt?: number };
+    }).connection;
+
+    if (connection) {
+      const effectiveType = connection.effectiveType ?? "unknown";
+      const downlink = typeof connection.downlink === "number" ? connection.downlink : 0;
+      networkLabel = downlink > 0
+        ? `${effectiveType.toUpperCase()} / ${downlink.toFixed(1)} Mbps`
+        : effectiveType.toUpperCase();
+
+      if (effectiveType === "slow-2g" || effectiveType === "2g") {
+        warning = "Network is very limited. The app will use its lowest video profile.";
+      }
+    } else {
+      networkLabel = "Browser does not expose network estimate";
+      warning = "Network estimate is unavailable; continue if the camera preview is stable.";
+    }
+
+    setReadiness({
+      status: cameraOk ? (warning ? "warning" : "pass") : "fail",
+      camera: cameraLabel,
+      network: networkLabel,
+      details: cameraOk
+        ? warning || "Camera preview is working and audio remains disabled."
+        : "Camera access is required before this church can go live.",
+    });
+  }, []);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -67,7 +155,6 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
       }
 
       setError("");
-      setFieldErrors({});
       setLoading(true);
       submittingRef.current = true;
 
@@ -75,10 +162,6 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
       const churchNameError = validateChurchName(churchName);
 
       if (sessionCodeError || churchNameError) {
-        setFieldErrors({
-          sessionCode: sessionCodeError,
-          churchName: churchNameError,
-        });
         setLoading(false);
         submittingRef.current = false;
         return;
@@ -141,7 +224,12 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
 
         const tokenData = await tokenResponse.json();
 
+        previewStreamRef.current?.getTracks().forEach((track) => track.stop());
+        previewStreamRef.current = null;
+
         onJoined({
+          sessionId: joinData.session.id,
+          healthToken: joinData.healthToken,
           token: tokenData.token,
           roomUrl: tokenData.roomUrl,
           churchName: joinData.church.name,
@@ -331,6 +419,56 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
             )}
           </div>
         </div>
+
+        <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="grid gap-4 lg:grid-cols-[180px_1fr]">
+            <div className="aspect-[4/3] overflow-hidden rounded-lg bg-slate-900">
+              <video
+                ref={previewRef}
+                autoPlay
+                playsInline
+                muted
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Pre-Meeting Readiness
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {readiness.details}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={runReadinessCheck}
+                  disabled={readiness.status === "checking" || loading}
+                  className="shrink-0 gap-2"
+                >
+                  {readiness.status === "checking" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Camera className="h-4 w-4" />
+                  )}
+                  Check Setup
+                </Button>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex items-center gap-3 rounded-lg bg-white p-3 text-sm">
+                  <Camera className="h-4 w-4 text-slate-500" />
+                  <span className="min-w-0 truncate text-slate-700">{readiness.camera}</span>
+                </div>
+                <div className="flex items-center gap-3 rounded-lg bg-white p-3 text-sm">
+                  <Wifi className="h-4 w-4 text-slate-500" />
+                  <span className="min-w-0 truncate text-slate-700">{readiness.network}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         {error && (
           <div

@@ -47,11 +47,18 @@ model Session {
   isActive          Boolean   @default(true)
   avgBandwidth      Int?
   connectionQuality String?
+  lastHealthAt      DateTime?
+  lastStatus        String?
+  videoStatus       String?
+  cameraEnabled     Boolean   @default(false)
+  packetLoss        Float?
+  reconnectCount    Int       @default(0)
 
   @@index([serviceId, isActive])
   @@index([churchId])
   @@index([joinedAt])
   @@index([joinedAt, leftAt])
+  @@index([lastHealthAt])
 }
 
 model User {

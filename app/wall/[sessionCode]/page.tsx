@@ -42,8 +42,12 @@ export default function WallPage({
 
   useEffect(() => {
     tokenRequestedRef.current = false;
-    setToken(null);
-    setRoomUrl(null);
+    const timeoutId = window.setTimeout(() => {
+      setToken(null);
+      setRoomUrl(null);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [resolvedParams.sessionCode]);
 
   useEffect(() => {

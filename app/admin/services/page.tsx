@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar, Plus, ArrowLeft, Loader2, Copy, Check, ExternalLink } from "lucide-react";
+import { Calendar, Plus, ArrowLeft, Loader2, Copy, Check, ExternalLink, Power, Square } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 
@@ -31,6 +31,7 @@ export default function ServicesPage() {
     maxChurches: 60,
   });
   const [submitting, setSubmitting] = useState(false);
+  const [updatingServiceId, setUpdatingServiceId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const fetchServices = async () => {
@@ -46,7 +47,11 @@ export default function ServicesPage() {
   };
 
   useEffect(() => {
-    fetchServices();
+    const timeoutId = window.setTimeout(() => {
+      void fetchServices();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,6 +81,26 @@ export default function ServicesPage() {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const updateService = async (id: string, action: "activate" | "deactivate" | "end") => {
+    setUpdatingServiceId(id);
+
+    try {
+      const response = await fetch("/api/admin/services", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action }),
+      });
+
+      if (response.ok) {
+        await fetchServices();
+      }
+    } catch (error) {
+      console.error("Error updating service:", error);
+    } finally {
+      setUpdatingServiceId(null);
+    }
   };
 
   return (
@@ -213,6 +238,32 @@ export default function ServicesPage() {
                       Open Wall
                     </Button>
                   </Link>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={updatingServiceId === service.id}
+                    onClick={() => updateService(service.id, service.active ? "deactivate" : "activate")}
+                    className="gap-2"
+                  >
+                    {updatingServiceId === service.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Power className="h-4 w-4" />
+                    )}
+                    {service.active ? "Lock Joins" : "Reopen"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={updatingServiceId === service.id || Boolean(service.endTime)}
+                    onClick={() => updateService(service.id, "end")}
+                    className="gap-2 border-rose-200 text-rose-700 hover:bg-rose-50"
+                  >
+                    <Square className="h-4 w-4" />
+                    {service.endTime ? "Ended" : "End Service"}
+                  </Button>
                 </div>
               </div>
             ))}

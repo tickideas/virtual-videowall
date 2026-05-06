@@ -9,6 +9,8 @@ import { logger } from "@/lib/logger";
 import { VIDEO_QUALITY, TIMEOUTS } from "@/lib/constants";
 
 interface ChurchRoomProps {
+  sessionId: string;
+  healthToken: string;
   token: string;
   roomUrl: string;
   churchName: string;
@@ -16,23 +18,26 @@ interface ChurchRoomProps {
   onLeave: () => void;
 }
 
-export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }: ChurchRoomProps) {
+export function ChurchRoom({ sessionId, healthToken, token, roomUrl, churchName, serviceName, onLeave }: ChurchRoomProps) {
   const callObjectRef = useRef<DailyCall | null>(null);
   const [callObject, setCallObject] = useState<DailyCall | null>(null);
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   const [connectionQuality, setConnectionQuality] = useState<"good" | "low" | "very-low">("good");
+  const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "reconnecting" | "disconnected" | "error">("connecting");
   const [isJoined, setIsJoined] = useState(false);
   const [connectionError, setConnectionError] = useState<string>("");
   const [reconnecting, setReconnecting] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
-  const [bandwidthMetrics, setBandwidthMetrics] = useState({
+  const [bandwidthMetrics, setBandwidthMetrics] = useState(() => ({
     upload: 0,
     download: 0,
     packetLoss: 0,
-    timestamp: Date.now()
-  });
-  const joinTimeRef = useRef<number>(Date.now());
+    timestamp: Date.now(),
+  }));
+  const joinTimeRef = useRef<number | null>(null);
+  const reconnectCountRef = useRef(0);
+  const manualLeaveRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const destroyPromiseRef = useRef<Promise<void> | null>(null);
 
@@ -66,6 +71,9 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       }
       logger.church("Joined meeting successfully");
       setIsJoined(true);
+      setConnectionStatus("connected");
+      setReconnecting(false);
+      setConnectionError("");
       joinTimeRef.current = Date.now();
       analytics.trackChurchJoin(serviceName, churchName, true);
     };
@@ -76,8 +84,12 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       }
       logger.church("Left meeting");
       setIsJoined(false);
-      const duration = Date.now() - joinTimeRef.current;
+      setConnectionStatus("disconnected");
+      const duration = Date.now() - (joinTimeRef.current ?? Date.now());
       analytics.trackChurchLeave(serviceName, churchName, duration);
+      if (manualLeaveRef.current) {
+        return;
+      }
       onLeave();
     };
 
@@ -142,16 +154,20 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       logger.error("Church: Daily.co error", error);
       const errorMessage = error.errorMsg || "Connection error occurred";
       setConnectionError(errorMessage);
+      setConnectionStatus("error");
 
       // Track video errors for analytics
       analytics.trackVideoError(errorMessage, 'church_room');
 
       // Attempt reconnection for certain error types
       if (errorMessage.includes("network") || errorMessage.includes("connection")) {
+        reconnectCountRef.current += 1;
         setReconnecting(true);
+        setConnectionStatus("reconnecting");
         setTimeout(() => {
           setReconnecting(false);
           setConnectionError("");
+          setConnectionStatus(callObjectRef.current ? "connected" : "disconnected");
         }, TIMEOUTS.RECONNECTION_DELAY_MS);
       }
     };
@@ -243,6 +259,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
         attachListeners(daily);
 
         logger.church("Joining room", roomUrl);
+        setConnectionStatus("connecting");
         await daily.join({
           url: roomUrl,
           token,
@@ -315,6 +332,7 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
 
       setIsJoined(false);
       setIsCameraEnabled(false);
+      setConnectionStatus("disconnected");
 
       // Clean up any remaining video element
       if (currentVideoRef) {
@@ -323,7 +341,112 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, roomUrl, onLeave]); // facingMode is intentionally not included - camera switching is handled separately
+  }, [token, roomUrl, onLeave, sessionId]); // facingMode is intentionally not included - camera switching is handled separately
+
+  useEffect(() => {
+    if (!sessionId || !healthToken) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const reportHealth = async () => {
+      const daily = callObjectRef.current;
+      let uploadKbps = Math.round(bandwidthMetrics.upload / 1000);
+      const packetLoss = bandwidthMetrics.packetLoss;
+
+      if (daily) {
+        try {
+          const stats = await daily.getNetworkStats();
+          if (stats?.stats?.latest?.sendBitsPerSecond) {
+            uploadKbps = Math.round(stats.stats.latest.sendBitsPerSecond / 1000);
+          }
+        } catch (error) {
+          logger.church("Failed to read health stats", error);
+        }
+      }
+
+      if (!isMounted) {
+        return;
+      }
+
+      try {
+        await fetch("/api/session/health", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            healthToken,
+            uploadKbps,
+            packetLoss,
+            connectionQuality,
+            cameraEnabled: isCameraEnabled,
+            status: connectionStatus,
+            videoStatus: isCameraEnabled ? "ready" : "muted",
+            reconnectCount: reconnectCountRef.current,
+          }),
+        });
+      } catch (error) {
+        logger.church("Failed to report session health", error);
+      }
+    };
+
+    void reportHealth();
+    const intervalId = setInterval(reportHealth, 10000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [
+    bandwidthMetrics.upload,
+    bandwidthMetrics.packetLoss,
+    connectionQuality,
+    connectionStatus,
+    isCameraEnabled,
+    healthToken,
+    sessionId,
+  ]);
+
+  useEffect(() => {
+    if (!isJoined) {
+      return;
+    }
+
+    let wakeLock: { release: () => Promise<void> } | null = null;
+    let isMounted = true;
+
+    const requestWakeLock = async () => {
+      const navigatorWithWakeLock = navigator as Navigator & {
+        wakeLock?: {
+          request: (type: "screen") => Promise<{ release: () => Promise<void> }>;
+        };
+      };
+
+      try {
+        wakeLock = await navigatorWithWakeLock.wakeLock?.request("screen") ?? null;
+      } catch (error) {
+        logger.church("Wake lock unavailable", error);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && isMounted && !wakeLock) {
+        void requestWakeLock();
+      }
+    };
+
+    void requestWakeLock();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      void wakeLock?.release().catch((error) => {
+        logger.church("Failed to release wake lock", error);
+      });
+    };
+  }, [isJoined]);
 
   // Handle video element
   useEffect(() => {
@@ -350,11 +473,21 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
   }, [callObject, isJoined]);
 
   const handleLeave = useCallback(async () => {
+    manualLeaveRef.current = true;
+    if (sessionId) {
+      await fetch("/api/session/leave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      }).catch((error) => {
+        logger.church("Failed to mark session as left", error);
+      });
+    }
     if (callObject) {
       await callObject.leave();
     }
     onLeave();
-  }, [callObject, onLeave]);
+  }, [callObject, onLeave, sessionId]);
 
   const toggleVideo = useCallback(async () => {
     if (!callObject) return;
@@ -439,7 +572,10 @@ export function ChurchRoom({ token, roomUrl, churchName, serviceName, onLeave }:
               <Signal className={`h-5 w-5 ${getConnectionQualityColor()}`} />
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-white capitalize">
-                  {connectionQuality === "very-low" ? "Poor" : connectionQuality}
+                    {connectionQuality === "very-low" ? "Poor" : connectionQuality}
+                </span>
+                <span className="text-xs text-gray-300 capitalize">
+                  {connectionStatus}
                 </span>
                 {bandwidthMetrics.upload > 0 && (
                   <span className="text-xs text-gray-300">

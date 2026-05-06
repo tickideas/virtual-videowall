@@ -76,3 +76,62 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const id = typeof body.id === "string" ? body.id : "";
+    const action = typeof body.action === "string" ? body.action : "";
+
+    if (!id || !["activate", "deactivate", "end"].includes(action)) {
+      return NextResponse.json(
+        { error: "Service ID and a valid action are required" },
+        { status: 400 },
+      );
+    }
+
+    const endedAt = new Date();
+    const [service] = await prisma.$transaction([
+      prisma.service.update({
+        where: { id },
+        data: {
+          active: action === "activate",
+          endTime:
+            action === "end"
+              ? endedAt
+              : action === "activate"
+                ? null
+                : undefined,
+        },
+      }),
+      ...(action === "end"
+        ? [
+            prisma.session.updateMany({
+              where: {
+                serviceId: id,
+                isActive: true,
+              },
+              data: {
+                isActive: false,
+                leftAt: endedAt,
+                lastStatus: "disconnected",
+              },
+            }),
+          ]
+        : []),
+    ]);
+
+    return NextResponse.json({ service });
+  } catch (error) {
+    console.error("Error updating service:", error);
+    return NextResponse.json(
+      { error: "Failed to update service" },
+      { status: 500 },
+    );
+  }
+}

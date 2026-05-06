@@ -16,7 +16,7 @@ export async function GET() {
       totalChurches,
       activeServices,
       totalSessions,
-      activeConnections
+      activeSessions
     ] = await Promise.all([
       prisma.church.count(),
       prisma.service.count({
@@ -25,20 +25,24 @@ export async function GET() {
         }
       }),
       prisma.session.count(),
-      // Count active connections by checking recent session activity
-      prisma.session.count({
+      prisma.session.findMany({
         where: {
-          joinedAt: {
-            gte: new Date(Date.now() - 5 * 60 * 1000) // Last 5 minutes
-          },
-          leftAt: null
-        }
+          isActive: true,
+          leftAt: null,
+        },
+        include: {
+          church: true,
+          service: true,
+        },
+        orderBy: { joinedAt: "desc" },
       })
     ]);
 
-    // Calculate bandwidth usage (estimated based on active connections)
-    const averageBandwidthPerChurch = 350; // Kbps estimated
-    const totalBandwidthUsage = activeConnections * averageBandwidthPerChurch; // Kbps
+    const activeConnections = activeSessions.length;
+    const totalBandwidthUsage = activeSessions.reduce(
+      (total, activeSession) => total + (activeSession.avgBandwidth ?? 0),
+      0,
+    );
 
     // Build recent activity feed from joins, leaves, and services created
     const [recentJoins, recentLeaves, recentServices] = await Promise.all([
@@ -100,6 +104,20 @@ export async function GET() {
       activeServices,
       totalSessions,
       activeConnections,
+      connections: activeSessions.map((activeSession) => ({
+        id: activeSession.id,
+        churchName: activeSession.church.name,
+        serviceName: activeSession.service.name,
+        avgBandwidth: activeSession.avgBandwidth,
+        connectionQuality: activeSession.connectionQuality,
+        lastHealthAt: activeSession.lastHealthAt,
+        lastStatus: activeSession.lastStatus,
+        videoStatus: activeSession.videoStatus,
+        cameraEnabled: activeSession.cameraEnabled,
+        packetLoss: activeSession.packetLoss,
+        reconnectCount: activeSession.reconnectCount,
+        joinedAt: activeSession.joinedAt,
+      })),
       bandwidthUsage: {
         total: totalBandwidthUsage,
         average: activeConnections > 0 ? totalBandwidthUsage / activeConnections : 0
