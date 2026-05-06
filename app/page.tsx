@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Video, Grid3x3, Shield, Users, Zap, Globe, ChevronRight } from "lucide-react";
+import { Video, Grid3x3, Shield, Users, Zap, Globe } from "lucide-react";
 
 export default function HomePage() {
   return (

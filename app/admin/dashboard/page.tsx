@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -48,7 +48,6 @@ type DashboardStatsResponse = Omit<DashboardStats, "recentActivity"> & {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   // Use Server-Sent Events for real-time updates (replaces polling)
   const { data: sseStats, isConnected } = useSSE<DashboardStatsResponse>({
@@ -92,12 +91,7 @@ export default function AdminDashboard() {
     };
   }, [sseStats]);
 
-  // Update lastUpdate timestamp when data changes
-  useEffect(() => {
-    if (sseStats) {
-      setLastUpdate(new Date());
-    }
-  }, [sseStats]);
+  const lastUpdate = useMemo(() => (sseStats ? new Date() : null), [sseStats]);
 
   const loading = !sseStats;
 

@@ -1,37 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generateSessionCode } from "@/lib/utils";
-import { analytics } from "@/lib/analytics";
+import { serverAnalytics } from "@/lib/server-analytics";
 
 export async function GET() {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    const churches = await prisma.$queryRaw`
-      SELECT
-        c.*,
-        COUNT(s.id) as "sessionCount"
-      FROM "Church" c
-      LEFT JOIN "Session" s ON c.id = s."churchId"
-      GROUP BY c.id, c.name, c.code, c.location, c."createdAt", c."updatedAt"
-      ORDER BY c.name ASC
-    ` as Array<{
-      id: string;
-      name: string;
-      code: string;
-      location: string | null;
-      createdAt: Date;
-      updatedAt: Date;
-      sessionCount: bigint;
-    }>;
+    const churches = await prisma.church.findMany({
+      orderBy: { name: "asc" },
+      include: {
+        _count: {
+          select: { sessions: true },
+        },
+      },
+    });
 
-    const formattedChurches = churches.map(church => ({
-      ...church,
-      sessionCount: Number(church.sessionCount),
-      _count: {
-        sessions: Number(church.sessionCount)
-      }
-    }));
-
-    return NextResponse.json({ churches: formattedChurches });
+    return NextResponse.json({ churches });
   } catch (error) {
     console.error("Error fetching churches:", error);
     return NextResponse.json(
@@ -42,6 +31,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { name, location } = body;
@@ -69,7 +63,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    analytics.trackChurchCreated(name, code);
+    void serverAnalytics.trackChurchCreated(name, code);
 
     return NextResponse.json({ church });
   } catch (error) {
@@ -82,6 +76,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

@@ -51,10 +51,6 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
     // eslint-disable-next-line prefer-const
     let loadingTimeout: NodeJS.Timeout;
 
-    // Set initial loading state
-    setIsLoading(true);
-    setConnectionStatus('connecting');
-
     const attemptPlayback = async () => {
       if (!videoRef.current) {
         logger.wall(`VideoTile [${participant.user_name}]: No video ref for playback`);

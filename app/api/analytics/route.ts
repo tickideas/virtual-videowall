@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { rateLimits } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
+  const rateLimitResponse = await rateLimits.api(request);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   try {
     const body = await request.json();
-    const { event, properties, timestamp } = body;
+    const { event, properties } = body;
 
     if (!event) {
       return NextResponse.json(

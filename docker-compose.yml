@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -19,19 +17,17 @@ services:
       timeout: 5s
       retries: 5
 
-  livekit:
-    image: livekit/livekit-server:latest
-    container_name: videowall-livekit
+  redis:
+    image: redis:7-alpine
+    container_name: videowall-redis
     restart: unless-stopped
-    command: --config /livekit.yaml
-    volumes:
-      - ./livekit.yaml:/livekit.yaml:ro
     ports:
-      - "7880:7880"
-      - "7881:7881"
-      - "50000-50020:50000-50020/udp"
-    depends_on:
-      - postgres
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   app:
     build:
@@ -41,18 +37,21 @@ services:
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgresql://videowall:${POSTGRES_PASSWORD:-changeme}@postgres:5432/videowall
+      - REDIS_URL=redis://redis:6379
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - LIVEKIT_URL=${LIVEKIT_URL:-ws://livekit:7880}
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+      - DAILY_API_KEY=${DAILY_API_KEY}
+      - DAILY_DOMAIN=${DAILY_DOMAIN}
+      - NEXT_PUBLIC_DAILY_DOMAIN=${NEXT_PUBLIC_DAILY_DOMAIN}
+      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-Virtual Video Wall}
+      - NEXT_PUBLIC_MAX_CHURCHES=${NEXT_PUBLIC_MAX_CHURCHES:-60}
     ports:
       - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
-      livekit:
-        condition: service_started
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:

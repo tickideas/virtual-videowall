@@ -117,13 +117,14 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
 
         // Use retry logic for getting token
         const tokenResponse = await retryFetch(
-          "/api/livekit/token",
+          "/api/daily/token",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               sessionCode: sessionCode.toUpperCase(),
               churchName: churchName.trim(),
+              sessionId: joinData.session.id,
               participantType: "church",
             }),
           },

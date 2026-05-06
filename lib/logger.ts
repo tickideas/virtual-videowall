@@ -3,8 +3,6 @@
  * Only logs in development, silent in production for performance
  */
 
-type LogLevel = 'log' | 'warn' | 'error' | 'info';
-
 class Logger {
   private isDevelopment: boolean;
 

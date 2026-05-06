@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserByEmail, verifyPassword } from "@/lib/auth";
+import { createAdminSessionToken, getUserByEmail, verifyPassword } from "@/lib/auth";
 import { rateLimits } from "@/lib/rate-limit";
-import { analytics } from "@/lib/analytics";
+import { serverAnalytics } from "@/lib/server-analytics";
 
 export async function POST(request: NextRequest) {
   // Apply strict rate limiting for auth endpoints
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const isValid = await verifyPassword(password, user.password);
 
     if (!isValid) {
-      analytics.trackAdminLogin(false, email);
+      void serverAnalytics.trackAdminLogin(false, email);
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
@@ -49,9 +49,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    analytics.trackAdminLogin(true, email);
+    void serverAnalytics.trackAdminLogin(true, email);
 
-    response.cookies.set("admin-session", user.id, {
+    response.cookies.set("admin-session", createAdminSessionToken(user.id), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
