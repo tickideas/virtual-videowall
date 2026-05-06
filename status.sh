@@ -15,20 +15,13 @@ fi
 
 echo ""
 
-# Check LiveKit
-if docker ps | grep -q videowall-livekit; then
-    echo "✅ LiveKit: Running"
-    echo "   Port: 7880, 7881, 50000-50020/udp"
-    
-    # Test connection
-    if curl -s http://localhost:7880/ > /dev/null 2>&1; then
-        echo "   Status: Responding ✓"
-    else
-        echo "   Status: Not responding ⚠"
-    fi
+# Check Redis
+if docker ps | grep -q videowall-redis; then
+    echo "✅ Redis: Running"
+    echo "   Port: 6379"
 else
-    echo "❌ LiveKit: Not running"
-    echo "   Start with: ./run-livekit.sh"
+    echo "⚠️  Redis: Not running"
+    echo "   Start with: docker compose up -d redis"
 fi
 
 echo ""

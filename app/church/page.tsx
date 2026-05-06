@@ -2,8 +2,7 @@
 
 import { useState, Suspense, lazy } from "react";
 import { ChurchJoinForm } from "@/components/church/church-join-form";
-import { ArrowLeft, Video, Grid3x3, Zap, Shield, Users } from "lucide-react";
-import Link from "next/link";
+import { Grid3x3 } from "lucide-react";
 import { ChurchJoinSkeleton } from "@/components/ui/skeletons";
 import { PageLoadingSpinner } from "@/components/ui/loading-spinner";
 

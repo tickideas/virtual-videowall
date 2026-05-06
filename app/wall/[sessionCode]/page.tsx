@@ -99,7 +99,7 @@ export default function WallPage({
       try {
         tokenRequestedRef.current = true;
         const tokenResponse = await retryFetch(
-          "/api/livekit/token",
+          "/api/daily/token",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

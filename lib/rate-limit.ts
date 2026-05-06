@@ -16,6 +16,22 @@ interface RateLimitOptions {
   keyGenerator?: (request: NextRequest) => string; // Custom key generator
 }
 
+const REDIS_RATE_LIMIT_SCRIPT = `
+  redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, ARGV[2])
+  local count = redis.call('ZCARD', KEYS[1])
+  local max = tonumber(ARGV[3])
+  local ttl = tonumber(ARGV[5])
+
+  if count < max then
+    redis.call('ZADD', KEYS[1], ARGV[1], ARGV[4])
+    redis.call('EXPIRE', KEYS[1], ttl)
+    return {1, max - count - 1}
+  end
+
+  redis.call('EXPIRE', KEYS[1], ttl)
+  return {0, 0}
+`;
+
 /**
  * Redis-based rate limiting with in-memory fallback
  * Scales horizontally when Redis is configured
@@ -35,32 +51,27 @@ async function checkRateLimitRedis(
   try {
     const now = Date.now();
     const windowStart = now - windowMs;
+    const ttlSeconds = Math.ceil(windowMs / 1000);
+    const member = `${now}-${Math.random()}`;
 
-    // Use Redis sorted set for sliding window
-    const pipeline = redis.pipeline();
+    const result = await redis.eval(
+      REDIS_RATE_LIMIT_SCRIPT,
+      1,
+      key,
+      now,
+      windowStart,
+      max,
+      member,
+      ttlSeconds,
+    );
 
-    // Remove old entries
-    pipeline.zremrangebyscore(key, 0, windowStart);
-
-    // Count current requests in window
-    pipeline.zcard(key);
-
-    // Add current request
-    pipeline.zadd(key, now, `${now}-${Math.random()}`);
-
-    // Set expiry on the key
-    pipeline.expire(key, Math.ceil(windowMs / 1000));
-
-    const results = await pipeline.exec();
-
-    if (!results) {
-      throw new Error('Redis pipeline failed');
+    if (!Array.isArray(result)) {
+      throw new Error('Redis rate limit script failed');
     }
 
-    // Get count after removing old entries (index 1 in results)
-    const count = (results[1][1] as number) || 0;
-    const allowed = count < max;
-    const remaining = Math.max(0, max - count - 1);
+    const [allowedFlag, remainingCount] = result as [number, number];
+    const allowed = allowedFlag === 1;
+    const remaining = Math.max(0, Number(remainingCount));
     const resetTime = now + windowMs;
 
     return { allowed, remaining, resetTime };

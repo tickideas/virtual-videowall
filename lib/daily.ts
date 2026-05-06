@@ -5,15 +5,24 @@
  * Replace this with your Daily.co API key from https://dashboard.daily.co/
  */
 
-const DAILY_API_KEY = process.env.DAILY_API_KEY;
-const DAILY_DOMAIN = process.env.DAILY_DOMAIN || process.env.NEXT_PUBLIC_DAILY_DOMAIN;
+function getDailyApiKey(): string {
+  const apiKey = process.env.DAILY_API_KEY;
 
-if (!DAILY_API_KEY) {
-  console.warn("Warning: DAILY_API_KEY is not set. Daily.co features will not work.");
+  if (!apiKey) {
+    throw new Error("DAILY_API_KEY must be set");
+  }
+
+  return apiKey;
 }
 
-if (!DAILY_DOMAIN) {
-  console.warn("Warning: DAILY_DOMAIN is not set. Using default domain.");
+function getDailyDomain(): string {
+  const domain = process.env.DAILY_DOMAIN || process.env.NEXT_PUBLIC_DAILY_DOMAIN;
+
+  if (!domain) {
+    throw new Error("DAILY_DOMAIN or NEXT_PUBLIC_DAILY_DOMAIN must be set");
+  }
+
+  return domain.replace(/^https?:\/\//, "").replace(/\.daily\.co$/, "");
 }
 
 export interface CreateRoomOptions {
@@ -46,11 +55,13 @@ export async function createOrGetDailyRoom({
   maxParticipants = 65,
 }: CreateRoomOptions): Promise<DailyRoom> {
   try {
+    const dailyApiKey = getDailyApiKey();
+
     // First, try to get the existing room
     const getResponse = await fetch(`https://api.daily.co/v1/rooms/${roomName}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${DAILY_API_KEY}`,
+        'Authorization': `Bearer ${dailyApiKey}`,
         'Content-Type': 'application/json',
       },
     });
@@ -63,12 +74,12 @@ export async function createOrGetDailyRoom({
     const createResponse = await fetch('https://api.daily.co/v1/rooms', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${DAILY_API_KEY}`,
+        'Authorization': `Bearer ${dailyApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         name: roomName,
-        privacy: 'public',
+        privacy: 'private',
         properties: {
           max_participants: maxParticipants,
           enable_screenshare: false,
@@ -105,10 +116,12 @@ export async function createDailyToken({
   canSubscribe = true,
 }: CreateTokenOptions): Promise<string> {
   try {
+    const dailyApiKey = getDailyApiKey();
+
     const response = await fetch('https://api.daily.co/v1/meeting-tokens', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${DAILY_API_KEY}`,
+        'Authorization': `Bearer ${dailyApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -145,10 +158,12 @@ export async function createDailyToken({
  */
 export async function deleteDailyRoom(roomName: string): Promise<void> {
   try {
+    const dailyApiKey = getDailyApiKey();
+
     const response = await fetch(`https://api.daily.co/v1/rooms/${roomName}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${DAILY_API_KEY}`,
+        'Authorization': `Bearer ${dailyApiKey}`,
       },
     });
 
@@ -165,7 +180,7 @@ export async function deleteDailyRoom(roomName: string): Promise<void> {
  * Get Daily.co room URL
  */
 export function getDailyRoomUrl(roomName: string): string {
-  return `https://${DAILY_DOMAIN}.daily.co/${roomName}`;
+  return `https://${getDailyDomain()}.daily.co/${roomName}`;
 }
 
 /**
