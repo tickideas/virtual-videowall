@@ -114,4 +114,4 @@ docker compose down
 
 ## Production
 
-Use [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for Coolify or Docker deployment.
+Use [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for Dokploy, Coolify, or Docker deployment.
