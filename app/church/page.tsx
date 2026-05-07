@@ -16,15 +16,21 @@ const ChurchRoom = lazy(() =>
 export default function ChurchPage() {
   const [token, setToken] = useState<string | null>(null);
   const [roomUrl, setRoomUrl] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [healthToken, setHealthToken] = useState<string | null>(null);
   const [churchName, setChurchName] = useState<string | null>(null);
   const [serviceName, setServiceName] = useState<string | null>(null);
 
   const handleJoined = (data: {
+    sessionId: string;
+    healthToken: string;
     token: string;
     roomUrl: string;
     churchName: string;
     serviceName: string;
   }) => {
+    setSessionId(data.sessionId);
+    setHealthToken(data.healthToken);
     setToken(data.token);
     setRoomUrl(data.roomUrl);
     setChurchName(data.churchName);
@@ -34,6 +40,8 @@ export default function ChurchPage() {
   const handleLeave = () => {
     setToken(null);
     setRoomUrl(null);
+    setSessionId(null);
+    setHealthToken(null);
     setChurchName(null);
     setServiceName(null);
   };
@@ -82,6 +90,8 @@ export default function ChurchPage() {
       ) : (
         <Suspense fallback={<PageLoadingSpinner message="Loading video room..." />}>
           <ChurchRoom
+            sessionId={sessionId || ""}
+            healthToken={healthToken || ""}
             token={token || ""}
             roomUrl={roomUrl || ""}
             churchName={churchName || ""}

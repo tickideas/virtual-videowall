@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimits } from "@/lib/rate-limit";
+import { createSessionHealthToken } from "@/lib/session-health-token";
 
 export async function POST(request: NextRequest) {
   // Apply rate limiting
@@ -85,6 +86,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         session: existingSession,
+        healthToken: createSessionHealthToken(existingSession.id),
         church,
         service,
       });
@@ -101,6 +103,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       session,
+      healthToken: createSessionHealthToken(session.id),
       church,
       service,
     });

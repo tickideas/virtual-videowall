@@ -46,7 +46,11 @@ export default function ChurchesPage() {
   };
 
   useEffect(() => {
-    fetchChurches();
+    const timeoutId = window.setTimeout(() => {
+      void fetchChurches();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -35,9 +35,9 @@ export const VIDEO_QUALITY = {
       bitrate: 400000, // 400 Kbps
     },
     "4G": {
-      width: 320,
-      height: 240,
-      frameRate: 12,
+      width: 240,
+      height: 180,
+      frameRate: 8,
       bitrate: 400000,
     },
   },

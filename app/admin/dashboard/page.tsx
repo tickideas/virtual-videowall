@@ -15,6 +15,8 @@ import {
   Radio,
   Shield,
   AlertCircle,
+  Camera,
+  RefreshCw,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,13 +38,33 @@ interface DashboardStats {
     total: number;
     average: number;
   };
+  connections: Array<{
+    id: string;
+    churchName: string;
+    serviceName: string;
+    avgBandwidth: number | null;
+    connectionQuality: string | null;
+    lastHealthAt: Date | null;
+    lastStatus: string | null;
+    videoStatus: string | null;
+    cameraEnabled: boolean;
+    packetLoss: number | null;
+    reconnectCount: number;
+    joinedAt: Date;
+  }>;
 }
 
 type DashboardActivity = DashboardStats["recentActivity"][number];
 
-type DashboardStatsResponse = Omit<DashboardStats, "recentActivity"> & {
+type DashboardStatsResponse = Omit<DashboardStats, "recentActivity" | "connections"> & {
   recentActivity?: Array<
     Omit<DashboardActivity, "timestamp"> & { timestamp: string }
+  >;
+  connections?: Array<
+    Omit<DashboardStats["connections"][number], "lastHealthAt" | "joinedAt"> & {
+      lastHealthAt: string | null;
+      joinedAt: string;
+    }
   >;
 };
 
@@ -62,6 +84,7 @@ export default function AdminDashboard() {
         total: 0,
         average: 0,
       },
+      connections: [],
     },
   });
 
@@ -78,6 +101,7 @@ export default function AdminDashboard() {
           total: 0,
           average: 0,
         },
+        connections: [],
       };
     }
 
@@ -88,10 +112,19 @@ export default function AdminDashboard() {
           ...activity,
           timestamp: new Date(activity.timestamp),
         })) || [],
+      connections:
+        sseStats.connections?.map((connection) => ({
+          ...connection,
+          lastHealthAt: connection.lastHealthAt
+            ? new Date(connection.lastHealthAt)
+            : null,
+          joinedAt: new Date(connection.joinedAt),
+        })) || [],
     };
   }, [sseStats]);
 
   const lastUpdate = useMemo(() => (sseStats ? new Date() : null), [sseStats]);
+  const healthNow = lastUpdate?.getTime() ?? 0;
 
   const loading = !sseStats;
 
@@ -155,6 +188,12 @@ export default function AdminDashboard() {
     ? "..."
     : `${stats.bandwidthUsage.average.toFixed(0)} Kbps`;
   const isBandwidthWarning = !loading && stats.bandwidthUsage.average > 400;
+  const staleConnectionCount = stats.connections.filter((connection) => {
+    if (!connection.lastHealthAt) {
+      return true;
+    }
+    return healthNow - connection.lastHealthAt.getTime() > 30000;
+  }).length;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -432,6 +471,140 @@ export default function AdminDashboard() {
               )}
             </div>
           </aside>
+        </section>
+
+        <section className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 p-6">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">
+                  Live Church Health
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Camera, bitrate, reconnect, and heartbeat status from each active church.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs font-medium">
+                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
+                  <Wifi className="h-3 w-3" />
+                  {stats.connections.length - staleConnectionCount} fresh
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-amber-700">
+                  <AlertCircle className="h-3 w-3" />
+                  {staleConnectionCount} stale
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            {stats.connections.length > 0 ? (
+              <table className="w-full min-w-[860px] text-left text-sm">
+                <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-6 py-3">Church</th>
+                    <th className="px-6 py-3">Status</th>
+                    <th className="px-6 py-3">Camera</th>
+                    <th className="px-6 py-3">Bandwidth</th>
+                    <th className="px-6 py-3">Reconnects</th>
+                    <th className="px-6 py-3">Last Health</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {stats.connections.map((connection) => {
+                    const isStale =
+                      !connection.lastHealthAt ||
+                      healthNow - connection.lastHealthAt.getTime() > 30000;
+                    const quality = connection.connectionQuality ?? "unknown";
+                    const status = isStale ? "stale" : connection.lastStatus ?? "connected";
+                    const bandwidth = connection.avgBandwidth ?? 0;
+                    const isOverTarget = bandwidth > 400;
+
+                    return (
+                      <tr
+                        key={connection.id}
+                        className="hover:bg-slate-50"
+                      >
+                        <td className="px-6 py-4">
+                          <p className="font-semibold text-slate-900">
+                            {connection.churchName}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {connection.serviceName}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize",
+                              status === "connected"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : status === "reconnecting"
+                                  ? "bg-amber-50 text-amber-700"
+                                  : "bg-rose-50 text-rose-700",
+                            )}
+                          >
+                            {status}
+                          </span>
+                          <p className="mt-1 text-xs capitalize text-slate-500">
+                            {quality}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center gap-2 text-slate-700">
+                            <Camera
+                              className={cn(
+                                "h-4 w-4",
+                                connection.cameraEnabled
+                                  ? "text-emerald-500"
+                                  : "text-slate-400",
+                              )}
+                            />
+                            {connection.cameraEnabled ? "On" : "Off"}
+                          </span>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Video: {connection.videoStatus ?? "unknown"}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p
+                            className={cn(
+                              "font-semibold tabular-nums",
+                              isOverTarget ? "text-amber-700" : "text-slate-900",
+                            )}
+                          >
+                            {bandwidth} Kbps
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Loss {(connection.packetLoss ?? 0).toFixed(1)}%
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center gap-2 text-slate-700">
+                            <RefreshCw className="h-4 w-4 text-slate-400" />
+                            {connection.reconnectCount}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-slate-600">
+                          {connection.lastHealthAt
+                            ? connection.lastHealthAt.toLocaleTimeString()
+                            : "No heartbeat"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <div className="px-6 py-10 text-center">
+                <WifiOff className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+                <p className="font-medium text-slate-700">No live church health yet</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Active churches will appear here after joining and sending their first heartbeat.
+                </p>
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Quick Actions */}

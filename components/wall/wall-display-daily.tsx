@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import DailyIframe, { DailyCall, DailyParticipant, DailyEventObjectTrack, DailyEventObjectParticipant } from "@daily-co/daily-js";
-import { ChevronLeft, ChevronRight, Maximize, Users, VideoOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, Maximize, Users, VideoOff, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { logger } from "@/lib/logger";
 import { VIDEO_WALL, TIMEOUTS } from "@/lib/constants";
@@ -17,14 +17,18 @@ interface WallDisplayProps {
 interface VideoTileProps {
   participant: DailyParticipant;
   callObject: DailyCall | null;
+  showDiagnostics: boolean;
 }
 
-const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
+const VideoTile = memo(({ participant, callObject, showDiagnostics }: VideoTileProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasVideo, setHasVideo] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const [lastFrameAt, setLastFrameAt] = useState<number | null>(null);
+  const [frameAgeSeconds, setFrameAgeSeconds] = useState<number | null>(null);
+  const [trackState, setTrackState] = useState<string>("unknown");
   const streamRef = useRef<MediaStream | null>(null);
   const lastTrackIdRef = useRef<string | null>(null);
 
@@ -98,6 +102,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
       setAutoplayBlocked(false);
       setIsLoading(true);
       setConnectionStatus('disconnected');
+      setFrameAgeSeconds(null);
     };
 
     const getParticipantSnapshot = () => {
@@ -142,6 +147,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
       setHasVideo(true);
       setIsLoading(false);
       setConnectionStatus('connected');
+      setTrackState(track.readyState);
 
       // Clear loading timeout if video loads successfully
       if (loadingTimeout) {
@@ -166,6 +172,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
         hasVideoElement: !!videoRef.current,
         subscribed: latestParticipant.tracks?.video?.subscribed,
       });
+      setTrackState(videoState ?? videoTrack?.readyState ?? "unknown");
 
       // Only reject if track doesn't exist or is ended
       // Be very permissive with state - even if state is "blocked", try to attach
@@ -243,6 +250,7 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
       if (event.track?.kind === "video" && event.participant?.session_id === participant.session_id) {
         cleanupStream();
         setHasVideo(false);
+        setTrackState("stopped");
       }
     };
 
@@ -275,6 +283,55 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
       setHasVideo(false);
     };
   }, [participant, callObject, participant.tracks?.video?.state, participant.tracks?.video?.track?.id]);
+
+  useEffect(() => {
+    if (!hasVideo || !videoRef.current) {
+      return;
+    }
+
+    let animationFrameId = 0;
+    let cancelled = false;
+    const videoElement = videoRef.current as HTMLVideoElement & {
+      requestVideoFrameCallback?: (callback: () => void) => number;
+      cancelVideoFrameCallback?: (handle: number) => void;
+    };
+
+    const markFrame = () => {
+      if (cancelled) {
+        return;
+      }
+      setLastFrameAt(Date.now());
+      setFrameAgeSeconds(0);
+      if (videoElement.requestVideoFrameCallback) {
+        animationFrameId = videoElement.requestVideoFrameCallback(markFrame);
+      } else {
+        animationFrameId = window.setTimeout(markFrame, 1000);
+      }
+    };
+
+    markFrame();
+
+    return () => {
+      cancelled = true;
+      if (videoElement.cancelVideoFrameCallback && animationFrameId) {
+        videoElement.cancelVideoFrameCallback(animationFrameId);
+      } else {
+        window.clearTimeout(animationFrameId);
+      }
+    };
+  }, [hasVideo]);
+
+  useEffect(() => {
+    if (!lastFrameAt) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setFrameAgeSeconds(Math.max(0, Math.round((Date.now() - lastFrameAt) / 1000)));
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [lastFrameAt]);
 
   return (
     <div
@@ -316,6 +373,13 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
               connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
             }`} title={`Status: ${connectionStatus}`}></div>
           </div>
+          {showDiagnostics && (
+            <div className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-1 text-[11px] text-white">
+              <p>Track: {trackState}</p>
+              <p>Frame: {frameAgeSeconds === null ? "waiting" : `${frameAgeSeconds}s ago`}</p>
+              {autoplayBlocked && <p>Playback: blocked</p>}
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gray-900">
@@ -337,6 +401,11 @@ const VideoTile = memo(({ participant, callObject }: VideoTileProps) => {
             {connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
           </p>
         )}
+        {showDiagnostics && (
+          <p className="text-gray-400 text-xs">
+            Video {hasVideo ? "attached" : "missing"} · Track {trackState}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -350,6 +419,8 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
   const [participants, setParticipants] = useState<DailyParticipant[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(true);
+  const [autoRotate, setAutoRotate] = useState(false);
   const destroyPromiseRef = useRef<Promise<void> | null>(null);
 
   // Initialize Daily.co call
@@ -591,6 +662,18 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
     }
   }, [currentPage]);
 
+  useEffect(() => {
+    if (!autoRotate || totalPages <= 1) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setCurrentPage((page) => (page + 1) % totalPages);
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [autoRotate, totalPages]);
+
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen();
@@ -648,6 +731,29 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
               </div>
             )}
             <Button
+              onClick={() => setAutoRotate((value) => !value)}
+              variant="outline"
+              size="sm"
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-2 sm:px-3"
+              aria-pressed={autoRotate}
+            >
+              <Activity className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline ml-1">
+                {autoRotate ? "Rotate On" : "Rotate Off"}
+              </span>
+            </Button>
+            <Button
+              onClick={() => setShowDiagnostics((value) => !value)}
+              variant="outline"
+              size="sm"
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-2 sm:px-3"
+              aria-pressed={showDiagnostics}
+            >
+              <span className="text-xs sm:text-sm">
+                {showDiagnostics ? "Hide Diagnostics" : "Show Diagnostics"}
+              </span>
+            </Button>
+            <Button
               onClick={toggleFullscreen}
               variant="outline"
               size="sm"
@@ -682,6 +788,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
                 key={participant.session_id}
                 participant={participant}
                 callObject={callObject}
+                showDiagnostics={showDiagnostics}
               />
             ))}
           </div>
