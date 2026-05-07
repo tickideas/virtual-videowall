@@ -5,10 +5,10 @@ A low-bandwidth optimized virtual video wall platform for connecting 50-60 churc
 ## 🚀 Major Platform Upgrade (2025)
 
 ### **Framework & Performance**
-- **Next.js 16**: Upgraded from Next.js 15 with Turbopack support for faster builds
+- **Next.js 16**: Current App Router framework with Turbopack support for faster builds
 - **React 19.2**: Latest stable version with improved performance and features
 - **Turbopack Integration**: Enhanced development and build performance
-- **TypeScript 5.6**: Latest compiler with improved type safety
+- **TypeScript 5.9**: Current compiler with improved type safety
 
 ### **Complete UI/UX Modernization**
 - **Professional Design System**: Modern, enterprise-grade interface redesign
@@ -76,7 +76,7 @@ A low-bandwidth optimized virtual video wall platform for connecting 50-60 churc
 • View database: `npm run db:studio`
 • Generate Prisma client: `npm run db:generate`
 
-Database must be running before executing any `db:*` commands. Use `docker-compose up -d` to start PostgreSQL.
+Database must be running before executing any `db:*` commands. Use `docker compose up -d postgres redis` for local PostgreSQL and Redis.
 
 ## Project Layout
 
@@ -121,7 +121,7 @@ Database must be running before executing any `db:*` commands. Use `docker-compo
 
 • **Next.js 16** with App Router (not Pages Router) and Turbopack support
 • **React 19.2** with latest performance features and improvements
-• **TypeScript 5.6** strict mode throughout for enhanced type safety
+• **TypeScript 5.9** strict mode throughout for enhanced type safety
 • **React Server Components** for admin pages where possible
 • **Client components** only when using hooks or browser APIs
 • **Prisma ORM** for all database queries (no raw SQL)
@@ -138,7 +138,7 @@ Database must be running before executing any `db:*` commands. Use `docker-compo
 • Export named components, not default exports for components
 • Keep components focused; split if > 200 lines
 • Error handling: try/catch with proper error messages
-• Use Zod for API input validation when needed
+• Validate API input with local parsers/helpers; add a schema library only when the endpoint complexity justifies it
 
 ### Modern Design System
 
@@ -296,8 +296,8 @@ npm run db:studio
 ### Load Testing (for 50+ churches)
 
 ```bash
-# Use LiveKit CLI or similar tool
-# Simulate 50+ participants joining
+# Use Daily.co test rooms and browser automation where possible
+# Simulate 50+ participants joining if tooling is available
 # Monitor CPU, memory, and network usage
 ```
 
@@ -350,7 +350,7 @@ DATABASE_URL=postgresql://...
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=<generate-unique>
 DAILY_API_KEY=<your-daily-api-key>
-NEXT_PUBLIC_DAILY_DOMAIN=<your-domain.daily.co>  # Client-side
+NEXT_PUBLIC_DAILY_DOMAIN=<your-daily-subdomain>  # Client-side
 ```
 
 - Server-side vars: No `NEXT_PUBLIC_` prefix
@@ -365,7 +365,7 @@ NEXT_PUBLIC_DAILY_DOMAIN=<your-domain.daily.co>  # Client-side
 
 ### 2. Database Connection Errors
 **Symptom**: `Can't reach database server`
-**Fix**: Ensure PostgreSQL running: `docker-compose up -d postgres`
+**Fix**: Ensure PostgreSQL is running: `docker compose up -d postgres`
 
 ### 3. Duplicate DailyIframe Instances
 **Symptom**: Console error about duplicate instances
@@ -443,7 +443,7 @@ Analytics data is stored locally and can be accessed via the browser's developer
 
 - **Quick Start**: [QUICKSTART.md](./QUICKSTART.md)
 - **Full Spec**: [SPEC.md](./SPEC.md)
-- **Deployment**: [DEPLOYMENT.md](./DEPLOYMENT.md)
+- **Deployment**: [DEPLOYMENT.md](./docs/DEPLOYMENT.md)
 - **Development**: [CONTRIBUTING.md](./CONTRIBUTING.md)
 - **Logs**: `docker logs <container>` or Next.js console
 - **Analytics**: Check browser's localStorage for analytics events
@@ -469,7 +469,7 @@ The 2025 upgrade transformed the platform from a basic, amateur-looking interfac
 ### Technical Excellence
 - **Next.js 16 + React 19.2**: Latest framework versions with performance benefits
 - **Turbopack Integration**: Faster development and build times
-- **TypeScript 5.6**: Enhanced type safety and developer experience
+- **TypeScript 5.9**: Enhanced type safety and developer experience
 - **Modern CSS**: Tailwind with custom design system
 - **Component Architecture**: Reusable, maintainable component library
 

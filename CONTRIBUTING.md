@@ -1,244 +1,99 @@
-# Contributing to Virtual Video Wall
-
-Thank you for your interest in contributing to the Virtual Video Wall project!
+# Contributing
 
 ## Development Setup
 
-### Prerequisites
-- Node.js 20+
-- PostgreSQL 16+
-- Docker (optional but recommended)
-
-### Quick Start
-
-1. **Clone the repository**
 ```bash
-git clone <repository-url>
-cd virtual-videowall
-```
-
-2. **Run setup script**
-```bash
-chmod +x scripts/setup.sh
-./scripts/setup.sh
-```
-
-3. **Start services**
-```bash
-# Using Docker Compose (recommended)
-docker-compose up -d
-
-# Or manually start PostgreSQL and LiveKit
-```
-
-4. **Start development server**
-```bash
+npm install
+cp .env.example .env
+docker compose up -d postgres redis
+npm run db:generate
+npm run db:push
+npm run db:seed
 npm run dev
 ```
 
-Visit http://localhost:3000
+The local app runs at http://localhost:3000.
 
 ## Project Structure
 
-```
-/app                    # Next.js App Router
-  /church              # Church interface pages
-  /wall                # Video wall display pages
-  /admin               # Admin portal pages
-  /api                 # API routes
-    /livekit          # LiveKit token generation
-    /session          # Session management
-    /service          # Service APIs
-    /auth             # Authentication
-
-/components            # React components
-  /ui                 # Reusable UI components
-  /church             # Church-specific components
-  /wall               # Wall display components
-  /admin              # Admin components
-
-/lib                   # Utilities and helpers
-  prisma.ts           # Prisma client
-  livekit.ts          # LiveKit utilities
-  utils.ts            # General utilities
-  auth.ts             # Authentication helpers
-
-/prisma                # Database
-  schema.prisma       # Database schema
-  seed.mjs            # Seed script
-
-/public                # Static assets
+```text
+app/
+  admin/             Admin pages
+  api/               Route handlers
+    daily/           Daily.co token endpoint
+    session/         Join, leave, and health endpoints
+    service/         Public service lookup
+    auth/            Admin login/logout
+  church/            Church join and streaming page
+  wall/              Wall entry and session wall pages
+components/
+  church/            Daily.co church broadcaster UI
+  wall/              Daily.co wall display
+  ui/                Reusable UI primitives
+lib/
+  daily.ts           Daily.co room/token helpers
+  prisma.ts          Prisma client singleton
+  rate-limit.ts      In-memory/Redis rate limiting
+  redis.ts           Optional Redis client
+  auth.ts            Cookie auth helpers
+prisma/
+  schema.prisma      Database schema
+  seed.mjs           Seed data
 ```
 
-## Coding Guidelines
+## Code Standards
 
-### TypeScript
-- Use TypeScript for all files
-- Define interfaces for props and API responses
-- Avoid `any` type
+- Use TypeScript strict mode and avoid `any`.
+- Use functional React components and hooks.
+- Keep components focused; split large components when a clear boundary appears.
+- Use Prisma for database access.
+- Validate route input before mutating data.
+- Use Tailwind CSS and existing UI primitives.
+- Keep Daily.co API keys on the server. Do not expose secrets through `NEXT_PUBLIC_*`.
 
-### React Components
-- Use functional components with hooks
-- Keep components small and focused
-- Extract reusable logic into custom hooks
+## Video Constraints
 
-### Styling
-- Use Tailwind CSS utility classes
-- Follow existing color scheme
-- Ensure mobile responsiveness
-
-### API Routes
-- Validate input with Zod
-- Return consistent error format
-- Log errors for debugging
-
-### Database
-- Use Prisma for all database queries
-- Create migrations for schema changes
-- Test queries with sample data
+- Church video stays at 240x180 and 8 fps.
+- Wall display stays paginated at 20 tiles max.
+- Audio stays disabled by default.
+- Do not create multiple Daily call instances in one component. Use refs and cleanup carefully.
 
 ## Testing
 
-### Manual Testing Checklist
+Run before opening a PR:
 
-**Church Interface:**
-- [ ] Enter valid/invalid codes
-- [ ] Camera selection works
-- [ ] Video preview displays
-- [ ] Join room successfully
-- [ ] Connection quality indicator
-
-**Wall Display:**
-- [ ] Enter valid session code
-- [ ] Grid layout correct (4x5)
-- [ ] Pagination works
-- [ ] Fullscreen toggle
-- [ ] Church names display
-
-**Admin Portal:**
-- [ ] Login with credentials
-- [ ] Dashboard shows stats
-- [ ] Create church with code
-- [ ] Create service with code
-- [ ] Session codes copy correctly
-
-### Load Testing
-
-Test with simulated churches:
 ```bash
-# Use LiveKit CLI to simulate participants
-lk room join --url ws://localhost:7880 --identity church1 --publish-video
-```
-
-## Pull Request Process
-
-1. **Create a branch**
-```bash
-git checkout -b feature/your-feature-name
-```
-
-2. **Make changes**
-- Write clear commit messages
-- Follow coding guidelines
-- Test your changes
-
-3. **Push and create PR**
-```bash
-git push origin feature/your-feature-name
-```
-
-4. **PR Description**
-- Describe what changed
-- Why the change was needed
-- How to test it
-- Screenshots if UI changes
-
-## Common Development Tasks
-
-### Add a new API endpoint
-
-1. Create route file in `/app/api/your-endpoint/route.ts`
-2. Implement GET/POST/etc. handlers
-3. Add validation with Zod
-4. Test with curl or Postman
-
-### Add a new database model
-
-1. Update `/prisma/schema.prisma`
-2. Run `npm run db:push`
-3. Update types if needed
-4. Test queries
-
-### Add a new page
-
-1. Create folder in `/app/your-page`
-2. Add `page.tsx` with component
-3. Update navigation if needed
-4. Test routing
-
-### Add a new component
-
-1. Create file in appropriate `/components` subfolder
-2. Export component
-3. Add to index if creating library
-4. Document props with TypeScript
-
-## Debugging
-
-### Database Issues
-```bash
-# View database in Prisma Studio
-npm run db:studio
-
-# Check migrations
-npx prisma migrate status
-
-# Reset database (⚠️ loses data)
-npx prisma migrate reset
-```
-
-### LiveKit Issues
-```bash
-# Check LiveKit logs
-docker logs videowall-livekit -f
-
-# Test LiveKit endpoint
-curl http://localhost:7880/
-```
-
-### Next.js Issues
-```bash
-# Clear Next.js cache
-rm -rf .next
-
-# Rebuild
+npm run lint
+npm run test
 npm run build
 ```
 
-## Performance Optimization
+Manual checks for affected areas:
 
-### Checklist
-- [ ] Images optimized and lazy-loaded
-- [ ] Components code-split
-- [ ] API responses cached where appropriate
-- [ ] Database queries indexed
-- [ ] Pagination implemented for large lists
+- Church join accepts valid session codes and rejects invalid ones.
+- Camera preview appears before joining.
+- Go Live connects and publishes video.
+- Wall display shows a maximum of 20 churches per page.
+- Pagination and fullscreen controls work.
+- Admin login, service creation, and session-code copy work.
+- Rate limit errors remain clear and church-friendly.
 
-## Security Considerations
+## Database Changes
 
-### Before Committing
-- [ ] No secrets in code
-- [ ] Environment variables documented
-- [ ] Input validation on all user input
-- [ ] SQL injection prevented (using Prisma)
-- [ ] XSS prevented (React escapes by default)
+1. Update `prisma/schema.prisma`.
+2. Add indexes for frequently queried fields.
+3. Run `npm run db:push` locally.
+4. Update `prisma/seed.mjs` if default data changes.
+5. Run `npm run db:generate`.
 
-## Questions?
+## Pull Requests
 
-- Check existing issues on GitHub
-- Read [SPEC.md](./SPEC.md) for technical details
-- Review [DEPLOYMENT.md](./DEPLOYMENT.md) for deployment info
+Include:
 
-## License
+- What changed and why.
+- How it was tested.
+- Screenshots or video for UI changes.
+- Database migration notes if the schema changed.
+- Bandwidth impact notes for video-related changes.
 
-This project is proprietary. Contributions are appreciated but all rights reserved.
+Use conventional commits such as `feat:`, `fix:`, `docs:`, `refactor:`, and `perf:`.
