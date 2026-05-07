@@ -7,12 +7,17 @@ import { Label } from "@/components/ui/label";
 import {
   Church,
   Plus,
-  ArrowLeft,
   Loader2,
   Trash2,
   AlertTriangle,
+  MapPin,
+  Hash,
+  LayoutGrid,
+  List,
 } from "lucide-react";
-import Link from "next/link";
+import { SiteFooter } from "@/components/layout/site-chrome";
+import { AdminHeader } from "@/components/admin/admin-header";
+import { cn } from "@/lib/utils";
 
 interface Church {
   id: string;
@@ -28,18 +33,27 @@ export default function ChurchesPage() {
   const [churches, setChurches] = useState<Church[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [formData, setFormData] = useState({ name: "", location: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const [churchToDelete, setChurchToDelete] = useState<Church | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const fetchChurches = async () => {
     try {
+      setError("");
       const response = await fetch("/api/admin/churches");
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || "Failed to load churches");
+      }
       const data = await response.json();
-      setChurches(data.churches);
+      setChurches(Array.isArray(data.churches) ? data.churches : []);
     } catch (error) {
       console.error("Error fetching churches:", error);
+      setChurches([]);
+      setError(error instanceof Error ? error.message : "Failed to load churches");
     } finally {
       setLoading(false);
     }
@@ -104,52 +118,39 @@ export default function ChurchesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <nav className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Link href="/admin/dashboard">
-                <Button variant="ghost" size="sm" className="h-10 lg:h-11">
-                  <ArrowLeft className="w-4 h-4 lg:w-5 lg:h-5" />
-                  <span className="hidden sm:inline ml-2">Back to Dashboard</span>
-                </Button>
-              </Link>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
-                  <Church className="w-5 h-5 text-white" />
-                </div>
-                <h1 className="text-xl lg:text-2xl font-bold text-slate-900">
-                  Church Directory
-                </h1>
-              </div>
-            </div>
-            <Button
-              onClick={() => setShowForm(!showForm)}
-              className="h-10 lg:h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-            >
-              <Plus className="w-4 h-4 lg:w-5 lg:h-5" />
-              <span className="hidden sm:inline ml-2">Add Church</span>
-            </Button>
-          </div>
-        </div>
-      </nav>
+    <div className="flex min-h-screen flex-col bg-slate-50">
+      <AdminHeader
+        actions={
+          <Button
+            onClick={() => setShowForm(!showForm)}
+            className="h-10 bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Church</span>
+          </Button>
+        }
+      />
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 lg:py-10">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
         {showForm && (
-          <div className="mb-8">
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6">
-                <h2 className="text-2xl font-bold text-white mb-2">
+          <div className="mb-5">
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <h2 className="text-lg font-bold text-slate-900">
                   Add New Church
                 </h2>
-                <p className="text-blue-100">
+                <p className="mt-1 text-sm text-slate-600">
                   Create a new church profile with unique identification
                 </p>
               </div>
-              <div className="p-8">
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid md:grid-cols-2 gap-6">
+              <div className="p-5">
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div
+                    className="grid gap-4"
+                    style={{
+                      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    }}
+                  >
                     <div className="space-y-2">
                       <Label htmlFor="name" className="text-sm font-medium text-slate-700">
                         Church Name <span className="text-red-500">*</span>
@@ -162,7 +163,7 @@ export default function ChurchesPage() {
                         }
                         required
                         placeholder="First Baptist Church"
-                        className="h-12"
+                        className="h-10"
                       />
                     </div>
                     <div className="space-y-2">
@@ -176,15 +177,15 @@ export default function ChurchesPage() {
                           setFormData({ ...formData, location: e.target.value })
                         }
                         placeholder="City, State"
-                        className="h-12"
+                        className="h-10"
                       />
                     </div>
                   </div>
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <Button 
                       type="submit" 
                       disabled={submitting}
-                      className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                      className="h-10 bg-blue-600 hover:bg-blue-700"
                     >
                       {submitting ? (
                         <>
@@ -202,7 +203,7 @@ export default function ChurchesPage() {
                       type="button"
                       variant="outline"
                       onClick={() => setShowForm(false)}
-                      className="h-12"
+                      className="h-10"
                     >
                       Cancel
                     </Button>
@@ -220,23 +221,73 @@ export default function ChurchesPage() {
             </div>
             <p className="text-slate-500">Loading churches...</p>
           </div>
+        ) : error ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-10 text-center">
+            <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-red-500" />
+            <h2 className="text-lg font-semibold text-red-900">Unable to load churches</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-red-700">{error}</p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setLoading(true);
+                void fetchChurches();
+              }}
+              className="mt-6 border-red-200 bg-white text-red-700 hover:bg-red-50"
+            >
+              Try Again
+            </Button>
+          </div>
         ) : (
           <>
-            {/* Stats Header */}
-            <div className="mb-8">
-              <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <div className="flex items-center justify-between">
+            <div className="mb-4">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-xl font-bold text-slate-900 mb-1">
+                    <h2 className="mb-1 text-lg font-bold text-slate-900">
                       Church Directory
                     </h2>
-                    <p className="text-slate-600">
+                    <p className="text-sm text-slate-600">
                       Manage your church network and their connection details
                     </p>
                   </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-bold text-slate-900">{churches.length}</div>
-                    <div className="text-sm text-slate-500">Total Churches</div>
+                  <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+                    <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("cards")}
+                        className={cn(
+                          "inline-flex h-8 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors",
+                          viewMode === "cards"
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-slate-500 hover:text-slate-900",
+                        )}
+                        aria-pressed={viewMode === "cards"}
+                      >
+                        <LayoutGrid className="h-4 w-4" />
+                        Cards
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("list")}
+                        className={cn(
+                          "inline-flex h-8 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors",
+                          viewMode === "list"
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-slate-500 hover:text-slate-900",
+                        )}
+                        aria-pressed={viewMode === "list"}
+                      >
+                        <List className="h-4 w-4" />
+                        List
+                      </button>
+                    </div>
+                    <div
+                      className="flex min-w-10 justify-center rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700"
+                      aria-label={`${churches.length} churches`}
+                    >
+                      {churches.length}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -255,55 +306,62 @@ export default function ChurchesPage() {
                 </p>
                 <Button
                   onClick={() => setShowForm(true)}
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                  className="bg-blue-600 hover:bg-blue-700"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Add Your First Church
                 </Button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            ) : viewMode === "list" ? (
+              <div className="space-y-3">
                 {churches.map((church) => (
-                  <div
+                  <article
                     key={church.id}
-                    className="group bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                    className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:border-slate-300 hover:shadow-md"
                   >
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center group-hover:from-blue-200 group-hover:to-indigo-200 transition-colors">
-                        <Church className="w-6 h-6 text-blue-600" />
+                    <div
+                      className="grid gap-4"
+                      style={{
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(180px, 1fr))",
+                      }}
+                    >
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                          <Church className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="truncate text-base font-semibold text-slate-900">
+                            {church.name}
+                          </h3>
+                          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+                            {church.location && (
+                              <span className="inline-flex items-center gap-1">
+                                <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                                {church.location}
+                              </span>
+                            )}
+                            <span>
+                              {church._count.sessions} session
+                              {church._count.sessions !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-slate-900 text-lg leading-tight mb-1">
-                          {church.name}
-                        </h3>
-                        {church.location && (
-                          <p className="text-sm text-slate-500 mb-3">
-                            {church.location}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <div className="bg-slate-50 rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+
+                      <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+                        <div>
+                          <span className="text-xs font-medium text-slate-500">
                             Church Code
                           </span>
-                          <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                          <div className="font-mono text-lg font-bold tracking-wider text-slate-900">
+                            {church.code}
+                          </div>
                         </div>
-                        <div className="text-2xl font-bold font-mono text-slate-900 tracking-wider">
-                          {church.code}
-                        </div>
+                        <Hash className="h-4 w-4 text-slate-400" />
                       </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                          <span className="text-sm text-slate-600">
-                            {church._count.sessions} session{church._count.sessions !== 1 ? 's' : ''}
-                          </span>
-                        </div>
+
+                      <div className="flex items-center justify-center">
                         <Button
                           variant="outline"
                           size="sm"
@@ -315,12 +373,79 @@ export default function ChurchesPage() {
                               ? "Cannot delete church with existing sessions"
                               : "Delete church"
                           }
+                          aria-label={`Delete ${church.name}`}
                         >
                           <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
-                  </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div
+                className="grid gap-4"
+                style={{
+                  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                }}
+              >
+                {churches.map((church) => (
+                  <article
+                    key={church.id}
+                    className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:border-slate-300 hover:shadow-md"
+                  >
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                          <Church className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="truncate text-base font-semibold text-slate-900">
+                            {church.name}
+                          </h3>
+                          {church.location && (
+                            <p className="mt-1 inline-flex items-center gap-1 text-sm text-slate-600">
+                              <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                              {church.location}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                          {church._count.sessions} session
+                          {church._count.sessions !== 1 ? "s" : ""}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setChurchToDelete(church)}
+                          disabled={church._count.sessions > 0}
+                          className="h-8 w-8 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          title={
+                            church._count.sessions > 0
+                              ? "Cannot delete church with existing sessions"
+                              : "Delete church"
+                          }
+                          aria-label={`Delete ${church.name}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-slate-50 p-3">
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-500">
+                          Church Code
+                        </span>
+                        <Hash className="h-4 w-4 text-slate-400" />
+                      </div>
+                      <div className="font-mono text-xl font-bold tracking-wider text-slate-900">
+                        {church.code}
+                      </div>
+                    </div>
+                  </article>
                 ))}
               </div>
             )}
@@ -328,18 +453,18 @@ export default function ChurchesPage() {
             {/* Delete Confirmation Modal */}
             {churchToDelete && (
               <div
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+                className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="delete-modal-title"
                 aria-describedby="delete-modal-description"
               >
-                <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full border border-slate-200">
+                <div className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-8">
                   <div className="flex items-center gap-4 mb-6">
                     <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
                       <AlertTriangle className="w-6 h-6 text-red-600" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h3
                         id="delete-modal-title"
                         className="text-xl font-bold text-slate-900"
@@ -385,7 +510,7 @@ export default function ChurchesPage() {
                     <h4 className="text-sm font-semibold text-slate-900 mb-3">
                       Church Details
                     </h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                       <div>
                         <span className="text-slate-500">Name</span>
                         <p className="font-medium text-slate-900">{churchToDelete.name}</p>
@@ -407,7 +532,7 @@ export default function ChurchesPage() {
                     </div>
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <Button
                       variant="outline"
                       onClick={() => setChurchToDelete(null)}
@@ -440,7 +565,8 @@ export default function ChurchesPage() {
             )}
           </>
         )}
-      </div>
+      </main>
+      <SiteFooter />
     </div>
   );
 }

@@ -184,12 +184,12 @@ export function getDailyRoomUrl(roomName: string): string {
 }
 
 /**
- * Video quality settings for low bandwidth (240x180 @ 8fps)
+ * Video quality settings for the standard church feed (360p @ 15fps)
  */
 export const DAILY_VIDEO_SETTINGS = {
-  width: 240,
-  height: 180,
-  frameRate: 8,
+  width: 640,
+  height: 360,
+  frameRate: 15,
   facingMode: 'user',
 };
 

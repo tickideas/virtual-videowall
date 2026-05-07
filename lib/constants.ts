@@ -17,33 +17,33 @@ export const VIDEO_WALL = {
 export const VIDEO_QUALITY = {
   PROFILES: {
     SLOW_2G: {
-      width: 120,
-      height: 90,
+      width: 320,
+      height: 180,
       frameRate: 4,
-      bitrate: 200000, // 200 Kbps
+      bitrate: 250000, // 250 Kbps
     },
     "2G": {
-      width: 160,
-      height: 120,
+      width: 640,
+      height: 360,
       frameRate: 6,
-      bitrate: 200000,
+      bitrate: 500000,
     },
     "3G": {
-      width: 240,
-      height: 180,
-      frameRate: 8,
-      bitrate: 400000, // 400 Kbps
+      width: 640,
+      height: 360,
+      frameRate: 15,
+      bitrate: 700000, // 700 Kbps
     },
     "4G": {
-      width: 240,
-      height: 180,
-      frameRate: 8,
-      bitrate: 400000,
+      width: 640,
+      height: 360,
+      frameRate: 15,
+      bitrate: 800000, // 800 Kbps
     },
   },
-  TARGET_BANDWIDTH_KBPS: 400,
+  TARGET_BANDWIDTH_KBPS: 800,
   LOW_QUALITY_THRESHOLD: 50, // Network quality score
-  POOR_NETWORK_BITRATE: 150000, // 150 Kbps
+  POOR_NETWORK_BITRATE: 300000, // 300 Kbps
 } as const;
 
 // Admin Dashboard
