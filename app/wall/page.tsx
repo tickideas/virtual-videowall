@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Grid3x3, ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { Grid3x3 } from "lucide-react";
+import { SiteFooter, SiteHeader } from "@/components/layout/site-chrome";
 
 export default function WallLandingPage() {
   const [sessionCode, setSessionCode] = useState("");
@@ -20,16 +20,10 @@ export default function WallLandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
-      <div className="container max-w-md">
-        <Link
-          href="/"
-          className="inline-flex items-center text-sm text-gray-400 hover:text-gray-200 mb-8"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Home
-        </Link>
-
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-gray-900 to-gray-800">
+      <SiteHeader />
+      <main className="flex flex-1 items-center justify-center p-4">
+        <div className="container max-w-md">
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mx-auto mb-6">
             <Grid3x3 className="w-8 h-8 text-green-600" />
@@ -58,7 +52,7 @@ export default function WallLandingPage() {
                 className="text-center text-2xl tracking-widest font-mono h-14"
               />
               <p className="text-xs text-gray-500 text-center">
-                6-digit service code
+                6-character service code
               </p>
             </div>
 
@@ -75,6 +69,8 @@ export default function WallLandingPage() {
          
         </div>
       </div>
+      </main>
+      <SiteFooter />
     </div>
   );
 }

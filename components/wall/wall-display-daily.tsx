@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import DailyIframe, { DailyCall, DailyParticipant, DailyEventObjectTrack, DailyEventObjectParticipant } from "@daily-co/daily-js";
-import { ChevronLeft, ChevronRight, Maximize, Users, VideoOff, Activity } from "lucide-react";
+import { Activity, ChevronLeft, ChevronRight, Grid3X3, Maximize, Pin, Users, VideoOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { logger } from "@/lib/logger";
 import { VIDEO_WALL, TIMEOUTS } from "@/lib/constants";
@@ -18,9 +18,26 @@ interface VideoTileProps {
   participant: DailyParticipant;
   callObject: DailyCall | null;
   showDiagnostics: boolean;
+  isFocused?: boolean;
+  onFocus?: () => void;
+  onClearFocus?: () => void;
 }
 
-const VideoTile = memo(({ participant, callObject, showDiagnostics }: VideoTileProps) => {
+function isWallViewer(participant: DailyParticipant) {
+  const name = participant.user_name?.trim().toLowerCase();
+  const userId = (participant as { user_id?: string }).user_id?.trim().toLowerCase();
+
+  return name === "viewer" || userId?.startsWith("viewer-") === true;
+}
+
+const VideoTile = memo(({
+  participant,
+  callObject,
+  showDiagnostics,
+  isFocused = false,
+  onFocus,
+  onClearFocus,
+}: VideoTileProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasVideo, setHasVideo] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
@@ -81,23 +98,17 @@ const VideoTile = memo(({ participant, callObject, showDiagnostics }: VideoTileP
       }
     };
 
-    const cleanupStream = (hardReset: boolean = false) => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => {
-          if (hardReset) {
-            track.stop?.();
-          }
-          track.enabled = false;
-        });
-      }
-
-      lastTrackIdRef.current = null;
-      streamRef.current = null;
-
+    const cleanupStream = () => {
       if (videoRef.current) {
+        videoRef.current.pause();
         videoRef.current.srcObject = null;
         videoRef.current.load();
       }
+
+      // Remote Daily tracks are owned by the call object. Detach them from the
+      // element only; disabling or stopping them can leave the wall with black video.
+      lastTrackIdRef.current = null;
+      streamRef.current = null;
 
       setAutoplayBlocked(false);
       setIsLoading(true);
@@ -335,54 +346,32 @@ const VideoTile = memo(({ participant, callObject, showDiagnostics }: VideoTileP
 
   return (
     <div
-      className="relative overflow-hidden rounded-lg bg-gray-800"
+      className={`group relative overflow-hidden rounded-lg border bg-black shadow-2xl ${
+        isFocused ? "h-full min-h-[280px] border-blue-500" : "border-white/10"
+      }`}
       style={{ aspectRatio: "16 / 9" }}
     >
-      {isLoading ? (
-        <div className="w-full h-full flex items-center justify-center bg-gray-900">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${
+          hasVideo ? "opacity-100" : "opacity-0"
+        }`}
+      />
+
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-3"></div>
             <p className="text-gray-400 text-sm">Connecting...</p>
           </div>
         </div>
-      ) : hasVideo ? (
-        <div className="relative h-full w-full">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="h-full w-full object-cover"
-          />
-          {autoplayBlocked && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/70">
-              <Button
-                variant="outline"
-                className="bg-white/10 border-white/40 text-white hover:bg-white/20"
-                onClick={handleManualPlay}
-                aria-label="Resume video playback"
-              >
-                Resume Video
-              </Button>
-            </div>
-          )}
-          {/* Connection Status Indicator */}
-          <div className="absolute top-2 right-2">
-            <div className={`w-3 h-3 rounded-full ${
-              connectionStatus === 'connected' ? 'bg-green-500' :
-              connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
-            }`} title={`Status: ${connectionStatus}`}></div>
-          </div>
-          {showDiagnostics && (
-            <div className="absolute left-2 top-2 rounded-md bg-black/70 px-2 py-1 text-[11px] text-white">
-              <p>Track: {trackState}</p>
-              <p>Frame: {frameAgeSeconds === null ? "waiting" : `${frameAgeSeconds}s ago`}</p>
-              {autoplayBlocked && <p>Playback: blocked</p>}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="flex h-full w-full items-center justify-center bg-gray-900">
+      )}
+
+      {!isLoading && !hasVideo && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
           <div className="text-center">
             <VideoOff className="w-12 h-12 text-gray-600 mx-auto mb-3" />
             <p className="text-gray-400 text-sm">No video</p>
@@ -392,8 +381,69 @@ const VideoTile = memo(({ participant, callObject, showDiagnostics }: VideoTileP
           </div>
         </div>
       )}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-        <p className="text-white text-sm font-medium truncate">
+
+      {hasVideo && autoplayBlocked && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+          <Button
+            variant="outline"
+            className="bg-white/10 border-white/40 text-white hover:bg-white/20"
+            onClick={handleManualPlay}
+            aria-label="Resume video playback"
+          >
+            Resume Video
+          </Button>
+        </div>
+      )}
+
+      {hasVideo && (
+        <>
+          <div className="absolute right-2 top-2">
+            <div className={`w-3 h-3 rounded-full ${
+              connectionStatus === 'connected' ? 'bg-green-500' :
+              connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'
+            }`} title={`Status: ${connectionStatus}`}></div>
+          </div>
+          {showDiagnostics && (
+            <div className="absolute left-2 top-12 rounded-md bg-black/70 px-2 py-1 text-[11px] text-white">
+              <p>Track: {trackState}</p>
+              <p>Frame: {frameAgeSeconds === null ? "waiting" : `${frameAgeSeconds}s ago`}</p>
+              {autoplayBlocked && <p>Playback: blocked</p>}
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="absolute left-2 top-2 flex gap-2">
+        {onFocus && !isFocused && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 border-white/25 bg-black/55 px-2 text-xs text-white backdrop-blur-sm hover:bg-white/15"
+            onClick={onFocus}
+            aria-label={`Focus ${participant.user_name || "church"}`}
+          >
+            <Pin className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Focus</span>
+          </Button>
+        )}
+        {onClearFocus && isFocused && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 border-white/25 bg-black/50 px-2 text-xs text-white backdrop-blur-sm hover:bg-white/15"
+            onClick={onClearFocus}
+            aria-label="Exit focused church view"
+          >
+            <X className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Exit Focus</span>
+          </Button>
+        )}
+      </div>
+
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/85 to-transparent p-3">
+        <p className={`truncate font-semibold text-white ${isFocused ? "text-lg" : "text-sm"}`}>
           {participant.user_name || "Unknown Church"}
         </p>
         {connectionStatus !== 'connected' && (
@@ -419,8 +469,9 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
   const [participants, setParticipants] = useState<DailyParticipant[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showDiagnostics, setShowDiagnostics] = useState(true);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [autoRotate, setAutoRotate] = useState(false);
+  const [focusedParticipantId, setFocusedParticipantId] = useState<string | null>(null);
   const destroyPromiseRef = useRef<Promise<void> | null>(null);
 
   // Initialize Daily.co call
@@ -476,9 +527,9 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
 
       const participantsList = Object.values(activeCall.participants())
         .filter((participant) => {
-          // Exclude local participant (the wall itself)
-          // We show all remote participants, even if video isn't ready yet
-          return !participant.local;
+          // Exclude local participants and non-publishing wall viewers.
+          // We still keep church participants while their camera track is starting.
+          return !participant.local && !isWallViewer(participant);
         })
         .sort((a, b) => (a.user_name || "").localeCompare(b.user_name || ""));
 
@@ -605,7 +656,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
     const subscriptionCheckInterval = setInterval(() => {
       if (activeCall && isMounted) {
         const currentParticipants = Object.values(activeCall.participants())
-          .filter((p) => !p.local);
+          .filter((p) => !p.local && !isWallViewer(p));
 
         if (currentParticipants.length > 0) {
           logger.wall("Wall: Periodic subscription check for", currentParticipants.length, "participants");
@@ -650,6 +701,18 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
     return participants.slice(startIdx, endIdx);
   }, [participants, currentPage]);
 
+  const focusedParticipant = useMemo(() => {
+    if (!focusedParticipantId) {
+      return null;
+    }
+
+    return participants.find((participant) => participant.session_id === focusedParticipantId) ?? null;
+  }, [focusedParticipantId, participants]);
+
+  const focusableParticipants = focusedParticipant
+    ? participants.filter((participant) => participant.session_id !== focusedParticipant.session_id)
+    : participants;
+
   const nextPage = useCallback(() => {
     if (currentPage < totalPages - 1) {
       setCurrentPage(currentPage + 1);
@@ -684,26 +747,52 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
     }
   }, []);
 
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
   return (
-    <div className="h-screen w-screen bg-gray-900 flex flex-col">
+    <div className="flex h-dvh w-full flex-col overflow-hidden bg-gray-900">
       {/* Header */}
-      <div className="flex-none bg-gray-800/50 backdrop-blur-sm px-3 sm:px-6 py-2 sm:py-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex flex-col gap-1 text-white">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="font-medium text-sm sm:text-base">{participants.length} Churches Connected</span>
-            </div>
-            <div className="text-xs sm:text-sm text-gray-300 truncate max-w-full">{serviceName}</div>
-            <div className="flex flex-wrap gap-2 sm:gap-4 text-xs text-gray-400">
-              <span>Session: {sessionCode}</span>
-              {totalPages > 1 && (
-                <span>Page {currentPage + 1} of {totalPages}</span>
-              )}
-            </div>
+      <div className="flex-none bg-gray-800/50 px-3 py-2 backdrop-blur-sm sm:px-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-300">
+            <span className="inline-flex items-center gap-1.5 font-semibold text-white" aria-label={`${participants.length} connected churches`}>
+              <Users className="h-4 w-4" />
+              {participants.length}
+            </span>
+            <span className="min-w-0 max-w-[36rem] truncate font-medium text-white">
+              {serviceName}
+            </span>
+            <span className="text-gray-400">Session: {sessionCode}</span>
+            <span className="text-gray-400">360p</span>
+            {focusedParticipant && (
+              <span className="min-w-0 truncate text-blue-200">
+                Focus: {focusedParticipant.user_name || "Unknown Church"}
+              </span>
+            )}
+            {totalPages > 1 && (
+              <span className="text-gray-400">Page {currentPage + 1}/{totalPages}</span>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {focusedParticipant && (
+              <Button
+                onClick={() => setFocusedParticipantId(null)}
+                variant="outline"
+                size="sm"
+                className="h-9 border-white/20 bg-white/10 px-2 text-white hover:bg-white/20 sm:px-3"
+              >
+                <Grid3X3 className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline ml-1">Grid View</span>
+              </Button>
+            )}
             {totalPages > 1 && (
               <div className="flex items-center gap-1 sm:gap-2">
                 <Button
@@ -711,7 +800,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
                   disabled={currentPage === 0}
                   variant="outline"
                   size="sm"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-2 sm:px-3"
+                  className="h-9 border-white/20 bg-white/10 px-2 text-white hover:bg-white/20 sm:px-3"
                   aria-label="Previous page"
                 >
                   <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -722,7 +811,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
                   disabled={currentPage === totalPages - 1}
                   variant="outline"
                   size="sm"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-2 sm:px-3"
+                  className="h-9 border-white/20 bg-white/10 px-2 text-white hover:bg-white/20 sm:px-3"
                   aria-label="Next page"
                 >
                   <span className="hidden sm:inline mr-1">Next</span>
@@ -734,8 +823,9 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
               onClick={() => setAutoRotate((value) => !value)}
               variant="outline"
               size="sm"
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-2 sm:px-3"
+              className="h-9 border-white/20 bg-white/10 px-2 text-white hover:bg-white/20 sm:px-3"
               aria-pressed={autoRotate}
+              aria-label={autoRotate ? "Disable auto rotate" : "Enable auto rotate"}
             >
               <Activity className="w-3 h-3 sm:w-4 sm:h-4" />
               <span className="hidden sm:inline ml-1">
@@ -746,7 +836,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
               onClick={() => setShowDiagnostics((value) => !value)}
               variant="outline"
               size="sm"
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-2 sm:px-3"
+              className="h-9 border-white/20 bg-white/10 px-2 text-white hover:bg-white/20 sm:px-3"
               aria-pressed={showDiagnostics}
             >
               <span className="text-xs sm:text-sm">
@@ -757,7 +847,7 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
               onClick={toggleFullscreen}
               variant="outline"
               size="sm"
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20 px-2 sm:px-3"
+              className="h-9 border-white/20 bg-white/10 px-2 text-white hover:bg-white/20 sm:px-3"
               aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             >
               <Maximize className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -770,8 +860,8 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
       </div>
 
       {/* Grid */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {currentParticipants.length === 0 ? (
+      <div className={`flex-1 p-3 sm:p-4 ${focusedParticipant ? "overflow-hidden" : "overflow-y-auto"}`}>
+        {participants.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center px-4">
               <Users className="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 mx-auto mb-4" />
@@ -781,14 +871,63 @@ export function WallDisplay({ token, roomUrl, serviceName, sessionCode }: WallDi
               </p>
             </div>
           </div>
+        ) : focusedParticipant ? (
+          <div className="grid h-full min-h-0 gap-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <div className="min-h-0">
+              <VideoTile
+                key={focusedParticipant.session_id}
+                participant={focusedParticipant}
+                callObject={callObject}
+                showDiagnostics={showDiagnostics}
+                isFocused
+                onClearFocus={() => setFocusedParticipantId(null)}
+              />
+            </div>
+
+            <aside className="min-h-0 overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
+              <div className="border-b border-white/10 px-3 py-3">
+                <p className="text-sm font-semibold text-white">Connected Churches</p>
+                <p className="text-xs text-gray-400">Select another church to focus</p>
+              </div>
+              <div className="max-h-full space-y-2 overflow-y-auto p-3">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-md border border-blue-400/40 bg-blue-500/15 px-3 py-2 text-left text-sm text-white"
+                  onClick={() => setFocusedParticipantId(focusedParticipant.session_id)}
+                >
+                  <span className="truncate">{focusedParticipant.user_name || "Unknown Church"}</span>
+                  <span className="ml-2 rounded-full bg-blue-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                    Live
+                  </span>
+                </button>
+                {focusableParticipants.map((participant) => (
+                  <button
+                    key={participant.session_id}
+                    type="button"
+                    className="flex w-full items-center justify-between rounded-md border border-white/10 bg-black/20 px-3 py-2 text-left text-sm text-gray-200 transition hover:border-white/25 hover:bg-white/10"
+                    onClick={() => setFocusedParticipantId(participant.session_id)}
+                  >
+                    <span className="truncate">{participant.user_name || "Unknown Church"}</span>
+                    <Pin className="ml-2 h-3.5 w-3.5 shrink-0 text-gray-400" />
+                  </button>
+                ))}
+              </div>
+            </aside>
+          </div>
         ) : (
-          <div className="grid gap-4 sm:gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', justifyContent: 'center', maxWidth: '100%' }}>
+          <div
+            className="grid gap-3 sm:gap-4 lg:gap-5"
+            style={{
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+            }}
+          >
             {currentParticipants.map((participant) => (
               <VideoTile
                 key={participant.session_id}
                 participant={participant}
                 callObject={callObject}
                 showDiagnostics={showDiagnostics}
+                onFocus={() => setFocusedParticipantId(participant.session_id)}
               />
             ))}
           </div>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import DailyIframe, { DailyCall, DailyEventObjectParticipant } from "@daily-co/daily-js";
 import { Button } from "@/components/ui/button";
-import { Video, VideoOff, PhoneOff, Signal, RefreshCw } from "lucide-react";
+import { Video, VideoOff, PhoneOff, Signal, RefreshCw, Info } from "lucide-react";
 import { analytics } from "@/lib/analytics";
 import { logger } from "@/lib/logger";
 import { VIDEO_QUALITY, TIMEOUTS } from "@/lib/constants";
@@ -552,138 +552,132 @@ export function ChurchRoom({ sessionId, healthToken, token, roomUrl, churchName,
     }
   };
 
+  const connectionPanelClass =
+    connectionQuality === "good"
+      ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-50"
+      : connectionQuality === "low"
+        ? "border-amber-500/40 bg-amber-500/20 text-amber-50"
+        : "border-red-500/40 bg-red-500/20 text-red-50";
+
   return (
-    <div className="flex min-h-screen w-screen flex-col bg-black md:h-screen">
+    <div className="flex min-h-dvh w-full flex-col overflow-x-hidden bg-black text-white">
       {/* Header Controls */}
-      <header className="z-50 bg-gray-900/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-5xl flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-sm font-semibold text-white sm:text-lg">{churchName}</h2>
-            <p className="truncate text-xs text-gray-300 sm:text-sm">{serviceName}</p>
+      <header className="z-50 flex-none border-b border-white/10 bg-gray-950/95 backdrop-blur-sm">
+        <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-3 px-3 py-3 sm:px-6">
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-semibold text-white sm:text-lg">{churchName}</h2>
+            <p className="truncate text-sm text-gray-300">{serviceName}</p>
           </div>
 
-          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-4">
-            {/* Prominent Connection Status - Always visible */}
-            <div className={`flex items-center gap-2 rounded-lg px-4 py-2 ${
-              connectionQuality === "good" ? "bg-green-500/20 border border-green-500/40" :
-              connectionQuality === "low" ? "bg-yellow-500/20 border border-yellow-500/40" :
-              "bg-red-500/20 border border-red-500/40"
-            }`}>
-              <Signal className={`h-5 w-5 ${getConnectionQualityColor()}`} />
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold text-white capitalize">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className={`flex min-h-16 flex-1 items-center gap-3 rounded-lg border px-4 py-3 ${connectionPanelClass}`}>
+              <Signal className={`h-6 w-6 shrink-0 ${getConnectionQualityColor()}`} />
+              <div className="min-w-0">
+                <p className="text-base font-semibold capitalize leading-tight text-white">
                     {connectionQuality === "very-low" ? "Poor" : connectionQuality}
-                </span>
-                <span className="text-xs text-gray-300 capitalize">
+                </p>
+                <p className="text-sm capitalize text-gray-200">
                   {connectionStatus}
-                </span>
+                </p>
                 {bandwidthMetrics.upload > 0 && (
-                  <span className="text-xs text-gray-300">
+                  <p className="text-sm text-gray-200">
                     {Math.round(bandwidthMetrics.upload / 1000)}kbps
-                  </span>
+                  </p>
                 )}
               </div>
             </div>
 
-            <Button
-              onClick={toggleVideo}
-              variant="ghost"
-              size="sm"
-              disabled={!isJoined}
-              className={`px-2 sm:px-3 ${
-                isCameraEnabled 
-                  ? 'bg-white/10 hover:bg-white/20' 
-                  : 'bg-red-500/20 hover:bg-red-500/30'
-              }`}
-            >
-              {isCameraEnabled ? (
-                <Video className="h-4 w-4 text-green-400" />
-              ) : (
-                <VideoOff className="h-4 w-4 text-red-400" />
-              )}
-              <span className="hidden ml-1 text-xs text-white sm:inline sm:text-sm">
-                {isCameraEnabled ? "On" : "Off"}
-              </span>
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                onClick={toggleVideo}
+                variant="ghost"
+                size="icon"
+                disabled={!isJoined}
+                className={`h-10 w-10 ${
+                  isCameraEnabled
+                    ? 'bg-white/10 hover:bg-white/20'
+                    : 'bg-red-500/20 hover:bg-red-500/30'
+                }`}
+                aria-label={isCameraEnabled ? "Turn camera off" : "Turn camera on"}
+              >
+                {isCameraEnabled ? (
+                  <Video className="h-4 w-4 text-green-400" />
+                ) : (
+                  <VideoOff className="h-4 w-4 text-red-400" />
+                )}
+              </Button>
 
-            <Button
-              onClick={switchCamera}
-              variant="ghost"
-              size="sm"
-              disabled={!isJoined || isSwitchingCamera || !isCameraEnabled}
-              className="px-2 sm:px-3 bg-white/10 hover:bg-white/20"
-              title={facingMode === "user" ? "Switch to back camera" : "Switch to front camera"}
-            >
-              <RefreshCw className={`h-4 w-4 text-white ${isSwitchingCamera ? 'animate-spin' : ''}`} />
-              <span className="hidden ml-1 text-xs text-white sm:inline sm:text-sm">
-                {facingMode === "user" ? "Back" : "Front"}
-              </span>
-            </Button>
+              <Button
+                onClick={switchCamera}
+                variant="ghost"
+                size="icon"
+                disabled={!isJoined || isSwitchingCamera || !isCameraEnabled}
+                className="h-10 w-10 bg-white/10 hover:bg-white/20"
+                title={facingMode === "user" ? "Switch to back camera" : "Switch to front camera"}
+                aria-label={facingMode === "user" ? "Switch to back camera" : "Switch to front camera"}
+              >
+                <RefreshCw className={`h-4 w-4 text-white ${isSwitchingCamera ? 'animate-spin' : ''}`} />
+              </Button>
 
-            <Button
-              onClick={handleLeave}
-              variant="destructive"
-              size="sm"
-              className="px-2 text-xs sm:px-4 sm:text-sm"
-            >
-              <PhoneOff className="h-4 w-4 sm:mr-1" />
-              <span className="hidden sm:inline">Leave Service</span>
-              <span className="sm:hidden">Leave</span>
-            </Button>
+              <Button
+                onClick={handleLeave}
+                variant="destructive"
+                size="sm"
+                className="h-10 px-3 text-sm font-semibold sm:px-4"
+              >
+                <PhoneOff className="h-4 w-4 sm:mr-1" />
+                <span>Leave</span>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Video Display */}
-      <div className="flex flex-1 flex-col px-2 pb-4 pt-20 sm:px-6 sm:pb-8 sm:pt-28 md:pt-24">
-        <div className="flex flex-1 items-center justify-center">
-          <div className="flex w-full max-w-7xl flex-col gap-6 lg:flex-row lg:items-start lg:gap-8 xl:gap-10">
-            <div className="flex-1">
-              <div className="aspect-video overflow-hidden rounded-xl bg-gray-900 shadow-2xl max-w-4xl mx-auto lg:max-w-none">
-                {isCameraEnabled ? (
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <VideoOff className="w-8 h-8 sm:w-16 sm:h-16 text-gray-600" />
-                  </div>
-                )}
+      <main className="flex flex-1 flex-col overflow-y-auto px-3 py-4 sm:px-6 sm:py-6">
+        <div className="mx-auto flex w-full max-w-[96rem] flex-1 flex-col gap-5">
+          <div className="flex flex-1 items-center justify-center">
+            <div className="aspect-video w-full max-w-5xl overflow-hidden rounded-xl bg-gray-950 shadow-2xl">
+              {isCameraEnabled ? (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  <VideoOff className="h-10 w-10 text-gray-600 sm:h-16 sm:w-16" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Landscape Mode Notice */}
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-blue-900 sm:p-5">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100">
+                <Info className="h-3 w-3 text-blue-600" />
+              </div>
+              <div className="text-left">
+                <p className="mb-1 text-sm font-semibold">
+                  Use Landscape Mode
+                </p>
+                <p className="text-sm leading-relaxed text-blue-800">
+                  For optimal video quality on the wall, place your phone in <strong>landscape (horizontal) mode</strong> on a stand. This helps the feed fill the 16:9 display properly.
+                </p>
               </div>
             </div>
+          </div>
 
-            <div className="w-full lg:w-80 xl:w-96 lg:flex-shrink-0">
-              {/* Landscape Mode Notice */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-5">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                <div className="text-left">
-                  <p className="text-sm font-medium text-blue-900 mb-1">
-                    📱 Best Practice: Use Landscape Mode
-                  </p>
-                  <p className="text-xs text-blue-700 leading-relaxed">
-                    For optimal video quality on the wall, please place your phone in <strong>landscape (horizontal) mode</strong> on a stand. 
-                    This ensures your video fills the 16:9 display properly and provides the best viewing experience for other churches.
-                  </p>
-                </div>
-              </div>
-              </div>
-
-              {/* Connection Status and Error Display */}
-              <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-lg p-4 sm:p-5 text-white text-center">
-                {connectionError ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 rounded-full bg-red-500 animate-pulse"></div>
-                      <p className="text-sm font-medium text-red-300">Connection Error</p>
+          {/* Connection Status and Error Display */}
+          <div className="rounded-lg bg-white/10 p-4 text-center text-white backdrop-blur-sm sm:p-5">
+            {connectionError ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-center gap-2">
+                  <div className="h-4 w-4 rounded-full bg-red-500 animate-pulse"></div>
+                  <p className="text-sm font-medium text-red-300">Connection Error</p>
                   </div>
                   <p className="text-xs text-red-200">{connectionError}</p>
                   {reconnecting && (
@@ -703,11 +697,11 @@ export function ChurchRoom({ sessionId, healthToken, token, roomUrl, churchName,
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-sm sm:text-lg font-medium mb-2">
+                  <p className="mb-2 text-sm font-semibold sm:text-lg">
                     {isJoined ? "You are now live on the video wall!" : "Connecting..."}
                   </p>
                  
-                  <div className="flex items-center justify-center gap-2 mt-3">
+                  <div className="mt-3 flex items-center justify-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${
                       isJoined ? 'bg-green-400' : 'bg-yellow-400 animate-pulse'
                     }`}></div>
@@ -717,11 +711,9 @@ export function ChurchRoom({ sessionId, healthToken, token, roomUrl, churchName,
                   </div>
                 </div>
                 )}
-              </div>
-            </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -94,9 +94,9 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
       previewStreamRef.current?.getTracks().forEach((track) => track.stop());
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: 240 },
-          height: { ideal: 180 },
-          frameRate: { ideal: 8, max: 8 },
+          width: { ideal: 640 },
+          height: { ideal: 360 },
+          frameRate: { ideal: 15, max: 15 },
         },
         audio: false,
       });
@@ -421,8 +421,8 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
         </div>
 
         <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="grid gap-4 lg:grid-cols-[180px_1fr]">
-            <div className="aspect-[4/3] overflow-hidden rounded-lg bg-slate-900">
+          <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)]">
+            <div className="h-48 w-full overflow-hidden rounded-lg bg-slate-900 sm:h-56 lg:h-auto lg:aspect-[4/3]">
               <video
                 ref={previewRef}
                 autoPlay
@@ -459,11 +459,11 @@ export function ChurchJoinForm({ onJoined }: ChurchJoinFormProps) {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="flex items-center gap-3 rounded-lg bg-white p-3 text-sm">
                   <Camera className="h-4 w-4 text-slate-500" />
-                  <span className="min-w-0 truncate text-slate-700">{readiness.camera}</span>
+                  <span className="min-w-0 break-words text-slate-700">{readiness.camera}</span>
                 </div>
                 <div className="flex items-center gap-3 rounded-lg bg-white p-3 text-sm">
                   <Wifi className="h-4 w-4 text-slate-500" />
-                  <span className="min-w-0 truncate text-slate-700">{readiness.network}</span>
+                  <span className="min-w-0 break-words text-slate-700">{readiness.network}</span>
                 </div>
               </div>
             </div>

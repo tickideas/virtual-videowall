@@ -2,18 +2,15 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   Calendar,
   Church,
   Activity,
-  Plus,
   LogOut,
   Users,
   Wifi,
   WifiOff,
   Radio,
-  Shield,
   AlertCircle,
   Camera,
   RefreshCw,
@@ -22,6 +19,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useSSE } from "@/lib/hooks/use-sse";
+import { SiteFooter } from "@/components/layout/site-chrome";
+import { AdminHeader } from "@/components/admin/admin-header";
+import { VIDEO_QUALITY } from "@/lib/constants";
 
 interface DashboardStats {
   totalChurches: number;
@@ -187,7 +187,8 @@ export default function AdminDashboard() {
   const formattedAverageUsage = loading
     ? "..."
     : `${stats.bandwidthUsage.average.toFixed(0)} Kbps`;
-  const isBandwidthWarning = !loading && stats.bandwidthUsage.average > 400;
+  const bandwidthTarget = VIDEO_QUALITY.TARGET_BANDWIDTH_KBPS;
+  const isBandwidthWarning = !loading && stats.bandwidthUsage.average > bandwidthTarget;
   const staleConnectionCount = stats.connections.filter((connection) => {
     if (!connection.lastHealthAt) {
       return true;
@@ -196,166 +197,174 @@ export default function AdminDashboard() {
   }).length;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-sm shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 lg:h-20">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg">
-                <Shield className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl lg:text-2xl font-bold text-slate-900">
-                  UKZ1 Admin Portal
-                </h1>
-                <p className="text-xs lg:text-sm text-slate-500">
-                  Control Center Dashboard
+    <div className="flex min-h-screen flex-col bg-slate-50">
+      <AdminHeader
+        actions={
+          <>
+            <div className="hidden items-center gap-3 text-sm sm:flex">
+              <div className="text-right">
+                <p className="text-xs font-medium text-slate-500">Last Updated</p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {lastUpdate ? lastUpdate.toLocaleTimeString() : "—"}
                 </p>
               </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-3 text-sm">
-                <div className="text-right">
-                  <p className="text-xs font-medium text-slate-500">Last Updated</p>
-                  <p className="text-sm font-semibold text-slate-900">
-                    {lastUpdate ? lastUpdate.toLocaleTimeString() : "—"}
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full font-medium",
-                    isConnected
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-slate-100 text-slate-600",
-                  )}
-                >
-                  <Radio
-                    className={cn("h-3 w-3", isConnected && "animate-pulse")}
-                  />
-                  {isConnected ? "Live" : "Offline"}
-                </span>
-              </div>
-              
-              <Button
-                onClick={handleLogout}
-                variant="outline"
-                className="gap-2 h-10 lg:h-11"
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium",
+                  isConnected
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-slate-100 text-slate-600",
+                )}
               >
-                <LogOut className="h-4 w-4 lg:h-5 lg:w-5" />
-                <span className="hidden sm:inline">Logout</span>
-              </Button>
+                <Radio className={cn("h-3 w-3", isConnected && "animate-pulse")} />
+                {isConnected ? "Live" : "Offline"}
+              </span>
             </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-12 pt-6 lg:pt-8">
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 sm:w-auto sm:px-4"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </Button>
+          </>
+        }
+      />
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-10 pt-5 sm:px-6 lg:px-8 lg:pt-8">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-2xl lg:text-3xl font-bold text-slate-900 mb-2">
-            Welcome to Your Dashboard
-          </h2>
-          <p className="text-slate-600">
-            Monitor your video wall services and manage church connections in real-time.
-          </p>
+        <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 sm:text-2xl lg:text-3xl">
+              Dashboard
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-slate-600">
+              Monitor live service health, bandwidth, and church connections.
+            </p>
+          </div>
+          <span
+            className={cn(
+              "inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold",
+              isConnected
+                ? "bg-emerald-100 text-emerald-700"
+                : "bg-slate-100 text-slate-600",
+            )}
+          >
+            <Radio className={cn("h-3 w-3", isConnected && "animate-pulse")} />
+            {isConnected ? "Live updates" : "Offline"}
+          </span>
         </div>
 
         {/* Stats Grid */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+        <section
+          className="mb-5 grid gap-3 lg:gap-4"
+          style={{
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          }}
+        >
           {statCards.map(
             ({ label, value, description, Icon, iconBg, iconColor }) => (
               <article
                 key={label}
-                className="group relative bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md sm:p-5"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className={cn("rounded-xl p-3 shadow-sm", iconBg)}>
-                    <Icon className={cn("h-6 w-6", iconColor)} />
+                <div className="mb-3 flex items-start justify-between gap-2">
+                  <div className={cn("rounded-lg p-2.5 shadow-sm", iconBg)}>
+                    <Icon className={cn("h-5 w-5", iconColor)} />
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl lg:text-3xl font-bold text-slate-900 tabular-nums">
+                    <p className="text-2xl font-bold tabular-nums text-slate-900 lg:text-3xl">
                       {value}
                     </p>
-                    <div className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-slate-50 text-slate-600 mt-1">
+                    <div className="mt-1 hidden items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-xs text-slate-600 sm:inline-flex">
                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
                       Active
                     </div>
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-900 mb-1">
+                  <h3 className="text-sm font-semibold leading-tight text-slate-900">
                     {label}
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="mt-1 hidden text-xs text-slate-500 sm:block">
                     {description}
                   </p>
                 </div>
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent to-blue-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
               </article>
             ),
           )}
         </section>
 
         {/* Dashboard Content Grid */}
-        <section className="grid gap-8 lg:grid-cols-3 mb-8">
+        <section
+          className="mb-6 grid gap-5"
+          style={{
+            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+          }}
+        >
           {/* Bandwidth Overview */}
-          <article className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100">
+          <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-100 p-4 sm:p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900 mb-2">
+                  <h2 className="text-base font-bold text-slate-900 sm:text-lg">
                     Network Performance
                   </h2>
-                  <p className="text-sm text-slate-600">
-                    Real-time bandwidth monitoring and usage analytics
+                  <p className="mt-1 text-sm text-slate-600">
+                    Keep average church bandwidth under {bandwidthTarget.toLocaleString()} Kbps.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                  <span className="text-sm font-medium text-emerald-600">Live</span>
+                <div className="hidden items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 sm:flex">
+                  <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
+                  Live
                 </div>
               </div>
             </div>
             
-            <div className="p-6">
-              <div className="grid gap-6 sm:grid-cols-2">
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <Wifi className="w-5 h-5 text-blue-600" />
+            <div className="p-4 sm:p-5">
+              <div
+                className="grid gap-3"
+                style={{
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                }}
+              >
+                <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-blue-600 shadow-sm">
+                      <Wifi className="h-4 w-4" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-slate-900">Total Usage</h3>
-                      <p className="text-xs text-slate-500">All active connections</p>
+                      <h3 className="text-sm font-semibold text-slate-900">Total Usage</h3>
+                      <p className="text-xs text-slate-500">Active connections</p>
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-slate-900">
+                  <p className="text-2xl font-bold tabular-nums text-slate-900">
                     {formattedTotalUsage}
                   </p>
                   <div className="mt-3 flex items-center gap-2">
-                    <div className="w-full bg-blue-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '65%' }}></div>
+                    <div className="h-2 w-full rounded-full bg-blue-200">
+                      <div className="h-2 rounded-full bg-blue-600" style={{ width: "65%" }} />
                     </div>
                     <span className="text-xs text-slate-500">65%</span>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-6 border border-emerald-100">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                      <Activity className="w-5 h-5 text-emerald-600" />
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4">
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-emerald-600 shadow-sm">
+                      <Activity className="h-4 w-4" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-slate-900">Average per Church</h3>
+                      <h3 className="text-sm font-semibold text-slate-900">Average per Church</h3>
                       <p className="text-xs text-slate-500">Per connection</p>
                     </div>
                   </div>
-                  <p className="text-3xl font-bold text-slate-900">
+                  <p className="text-2xl font-bold tabular-nums text-slate-900">
                     {formattedAverageUsage}
                   </p>
                   <div className="mt-3 flex items-center gap-2">
-                    <div className="w-full bg-emerald-200 rounded-full h-2">
+                    <div className="h-2 w-full rounded-full bg-emerald-200">
                       <div 
                         className={cn(
                           "h-2 rounded-full",
@@ -375,15 +384,15 @@ export default function AdminDashboard() {
               </div>
               
               {isBandwidthWarning && (
-                <div className="mt-6 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4">
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
                   <div className="flex items-start gap-3">
                     <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                       <AlertCircle className="w-4 h-4 text-amber-600" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-amber-900 mb-1">Bandwidth Alert</h4>
+                      <h4 className="mb-1 font-semibold text-amber-900">Bandwidth Alert</h4>
                       <p className="text-sm text-amber-800">
-                        Average bandwidth usage is above the recommended 400 Kbps. 
+                        Average bandwidth usage is above the recommended {bandwidthTarget.toLocaleString()} Kbps.
                         Consider optimizing video quality or reducing active connections to maintain service quality.
                       </p>
                     </div>
@@ -394,8 +403,8 @@ export default function AdminDashboard() {
           </article>
 
           {/* Recent Activity */}
-          <aside className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100">
+          <aside className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-100 p-4 sm:p-5">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-slate-900">
                   Recent Activity
@@ -406,7 +415,7 @@ export default function AdminDashboard() {
               </div>
             </div>
             
-            <div className="p-6">
+            <div className="p-4 sm:p-5">
               {loading ? (
                 <div className="space-y-4">
                   {[...Array(5)].map((_, i) => (
@@ -473,11 +482,11 @@ export default function AdminDashboard() {
           </aside>
         </section>
 
-        <section className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 p-6">
+        <section className="mb-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 p-4 sm:p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">
+                <h2 className="text-base font-bold text-slate-900 sm:text-lg">
                   Live Church Health
                 </h2>
                 <p className="mt-1 text-sm text-slate-600">
@@ -518,7 +527,7 @@ export default function AdminDashboard() {
                     const quality = connection.connectionQuality ?? "unknown";
                     const status = isStale ? "stale" : connection.lastStatus ?? "connected";
                     const bandwidth = connection.avgBandwidth ?? 0;
-                    const isOverTarget = bandwidth > 400;
+                    const isOverTarget = bandwidth > bandwidthTarget;
 
                     return (
                       <tr
@@ -607,141 +616,8 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        {/* Quick Actions */}
-        <section className="grid gap-6 md:grid-cols-2 mb-8">
-          <Link
-            href="/admin/services"
-            className="group bg-white rounded-2xl border border-slate-200 p-8 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden relative"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/0 to-emerald-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="rounded-xl bg-emerald-100 p-4 group-hover:bg-emerald-200 transition-colors">
-                  <Calendar className="h-8 w-8 text-emerald-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">
-                    Service Management
-                  </h3>
-                  <p className="text-slate-600 leading-relaxed">
-                    Create, schedule, and manage your zonal meetings and video sessions with comprehensive control.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                  <span className="text-sm font-medium text-emerald-600">Ready to create</span>
-                </div>
-                <span className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition group-hover:bg-emerald-600 group-hover:gap-3">
-                  <Plus className="h-4 w-4" />
-                  New Service
-                </span>
-              </div>
-            </div>
-          </Link>
-
-          <Link
-            href="/admin/churches"
-            className="group bg-white rounded-2xl border border-slate-200 p-8 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden relative"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/0 to-blue-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <div className="relative">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="rounded-xl bg-blue-100 p-4 group-hover:bg-blue-200 transition-colors">
-                  <Church className="h-8 w-8 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">
-                    Church Directory
-                  </h3>
-                  <p className="text-slate-600 leading-relaxed">
-                    Manage your church network with detailed profiles, unique codes, and connection tracking.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <span className="text-sm font-medium text-blue-600">{stats.totalChurches} churches</span>
-                </div>
-                <span className="inline-flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition group-hover:bg-blue-600 group-hover:gap-3">
-                  <Plus className="h-4 w-4" />
-                  Add Church
-                </span>
-              </div>
-            </div>
-          </Link>
-        </section>
-
-        {/* Quick Start Guide */}
-        <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl overflow-hidden">
-          <div className="p-8 lg:p-10">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
-                <Shield className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white mb-1">
-                  Quick Start Guide
-                </h3>
-                <p className="text-slate-300">
-                  Get your video wall running in minutes
-                </p>
-              </div>
-            </div>
-            
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center text-white font-bold text-sm">1</div>
-                  <h4 className="font-semibold text-white">Setup Churches</h4>
-                </div>
-                <p className="text-slate-300 text-sm leading-relaxed">
-                  Create church profiles with unique 6-digit codes for identification and security.
-                </p>
-              </div>
-              
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white font-bold text-sm">2</div>
-                  <h4 className="font-semibold text-white">Create Service</h4>
-                </div>
-                <p className="text-slate-300 text-sm leading-relaxed">
-                  Schedule your zonal meeting and generate a session code for churches to join.
-                </p>
-              </div>
-              
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-lg bg-purple-500 flex items-center justify-center text-white font-bold text-sm">3</div>
-                  <h4 className="font-semibold text-white">Monitor & Manage</h4>
-                </div>
-                <p className="text-slate-300 text-sm leading-relaxed">
-                  Open the video wall, monitor connections, and ensure smooth streaming experience.
-                </p>
-              </div>
-            </div>
-            
-            <div className="mt-8 flex flex-col sm:flex-row gap-4">
-              <Link
-                href="/admin/churches"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors"
-              >
-                <Church className="w-4 h-4" />
-                Start with Churches
-              </Link>
-              <Link
-                href="/admin/services"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/30 bg-transparent px-6 py-3 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
-              >
-                <Calendar className="w-4 h-4" />
-                Create Service
-              </Link>
-            </div>
-          </div>
-        </section>
       </main>
+      <SiteFooter />
     </div>
   );
 }
