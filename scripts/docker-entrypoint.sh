@@ -1,11 +1,13 @@
 #!/bin/sh
 set -e
 
+PRISMA_BIN="node ./node_modules/prisma/build/index.js"
+
 echo "▶ Applying database schema..."
 if [ -d "./prisma/migrations" ] && [ -n "$(ls -A ./prisma/migrations 2>/dev/null)" ]; then
-  npx --no-install prisma migrate deploy
+  $PRISMA_BIN migrate deploy
 else
-  npx --no-install prisma db push --skip-generate
+  $PRISMA_BIN db push --skip-generate
 fi
 
 if [ "${RUN_SEED_ON_START:-false}" = "true" ]; then
