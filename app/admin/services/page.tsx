@@ -47,6 +47,11 @@ export default function ServicesPage() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [error, setError] = useState("");
 
+  const readErrorMessage = async (response: Response, fallback: string) => {
+    const data = await response.json().catch(() => null);
+    return data?.error || fallback;
+  };
+
   const fetchServices = async () => {
     try {
       setError("");
@@ -76,6 +81,7 @@ export default function ServicesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
     setSubmitting(true);
 
     try {
@@ -85,25 +91,35 @@ export default function ServicesPage() {
         body: JSON.stringify(formData),
       });
 
-      if (response.ok) {
-        setFormData({ name: "", startTime: "", maxChurches: 60 });
-        setShowForm(false);
-        fetchServices();
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, "Failed to create service"));
       }
+
+      setFormData({ name: "", startTime: "", maxChurches: 60 });
+      setShowForm(false);
+      await fetchServices();
     } catch (error) {
       console.error("Error creating service:", error);
+      setError(error instanceof Error ? error.message : "Failed to create service");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const copyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2000);
+  const copyCode = async (code: string) => {
+    setError("");
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch (error) {
+      console.error("Error copying service code:", error);
+      setError("Unable to copy code. Please copy it manually.");
+    }
   };
 
   const updateService = async (id: string, action: "activate" | "deactivate" | "end") => {
+    setError("");
     setUpdatingServiceId(id);
 
     try {
@@ -113,11 +129,14 @@ export default function ServicesPage() {
         body: JSON.stringify({ id, action }),
       });
 
-      if (response.ok) {
-        await fetchServices();
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, "Failed to update service"));
       }
+
+      await fetchServices();
     } catch (error) {
       console.error("Error updating service:", error);
+      setError(error instanceof Error ? error.message : "Failed to update service");
     } finally {
       setUpdatingServiceId(null);
     }
@@ -328,7 +347,7 @@ export default function ServicesPage() {
                       </p>
                     </div>
                     <button
-                      onClick={() => copyCode(service.sessionCode)}
+                      onClick={() => void copyCode(service.sessionCode)}
                       className="rounded-md p-2 transition-colors hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                       title="Copy session code"
                       aria-label={`Copy session code ${service.sessionCode}`}
@@ -358,7 +377,7 @@ export default function ServicesPage() {
                     size="sm"
                     variant="outline"
                     disabled={updatingServiceId === service.id}
-                    onClick={() => updateService(service.id, service.active ? "deactivate" : "activate")}
+                    onClick={() => void updateService(service.id, service.active ? "deactivate" : "activate")}
                     className="gap-2"
                   >
                     {updatingServiceId === service.id ? (
@@ -372,7 +391,7 @@ export default function ServicesPage() {
                     size="sm"
                     variant="outline"
                     disabled={updatingServiceId === service.id || Boolean(service.endTime)}
-                    onClick={() => updateService(service.id, "end")}
+                    onClick={() => void updateService(service.id, "end")}
                     className="gap-2 border-rose-200 text-rose-700 hover:bg-rose-50"
                   >
                     <Square className="h-4 w-4" />
