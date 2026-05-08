@@ -39,6 +39,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (user.role.toLowerCase() !== "admin") {
+      void serverAnalytics.trackAdminLogin(false, email);
+      return NextResponse.json(
+        { error: "Invalid credentials" },
+        { status: 401 }
+      );
+    }
+
     const response = NextResponse.json({
       success: true,
       user: {

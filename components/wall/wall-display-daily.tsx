@@ -48,6 +48,17 @@ const VideoTile = memo(({
   const [trackState, setTrackState] = useState<string>("unknown");
   const streamRef = useRef<MediaStream | null>(null);
   const lastTrackIdRef = useRef<string | null>(null);
+  const participantRef = useRef(participant);
+  const participantSessionId = participant.session_id;
+  const participantName = participant.user_name || "Unknown Church";
+  const currentVideoTrackId =
+    participant.tracks?.video?.track?.id ??
+    (participant.tracks?.video as { persistentTrack?: MediaStreamTrack })?.persistentTrack?.id ??
+    null;
+
+  useEffect(() => {
+    participantRef.current = participant;
+  }, [participant]);
 
   const handleManualPlay = useCallback(async () => {
     if (!videoRef.current) {
@@ -63,18 +74,18 @@ const VideoTile = memo(({
   }, []);
 
   useEffect(() => {
-    if (!callObject || !participant) {
+    if (!callObject) {
       return;
     }
 
-    logger.wall(`VideoTile [${participant.user_name}]: useEffect triggered - track state:`, participant.tracks?.video?.state);
+    logger.wall(`VideoTile [${participantName}]: useEffect triggered`);
 
     // eslint-disable-next-line prefer-const
     let loadingTimeout: NodeJS.Timeout;
 
     const attemptPlayback = async () => {
       if (!videoRef.current) {
-        logger.wall(`VideoTile [${participant.user_name}]: No video ref for playback`);
+        logger.wall(`VideoTile [${participantName}]: No video ref for playback`);
         return;
       }
 
@@ -86,13 +97,13 @@ const VideoTile = memo(({
         videoRef.current.setAttribute("muted", "muted");
         videoRef.current.setAttribute("playsinline", "true");
 
-        logger.wall(`VideoTile [${participant.user_name}]: Attempting playback`);
+        logger.wall(`VideoTile [${participantName}]: Attempting playback`);
         await videoRef.current.play();
-        logger.wall(`VideoTile [${participant.user_name}]: Playback started successfully`);
+        logger.wall(`VideoTile [${participantName}]: Playback started successfully`);
         setAutoplayBlocked(false);
         setConnectionStatus('connected');
       } catch (error) {
-        logger.warn(`VideoTile [${participant.user_name}]: Autoplay blocked or playback failed`, error);
+        logger.warn(`VideoTile [${participantName}]: Autoplay blocked or playback failed`, error);
         setAutoplayBlocked(true);
         setConnectionStatus('disconnected');
       }
@@ -118,16 +129,16 @@ const VideoTile = memo(({
 
     const getParticipantSnapshot = () => {
       if (!callObject) {
-        return participant;
+        return participantRef.current;
       }
 
       const participants = callObject.participants() ?? {};
-      const latest = participants[participant.session_id];
-      return latest ?? participant;
+      const latest = participants[participantSessionId];
+      return latest ?? participantRef.current;
     };
 
     const attachTrackToElement = (track: MediaStreamTrack | null, stream?: MediaStream | null) => {
-      logger.wall(`VideoTile [${participant.user_name}]: attachTrackToElement called`, {
+      logger.wall(`VideoTile [${participantName}]: attachTrackToElement called`, {
         hasTrack: !!track,
         trackId: track?.id,
         trackReadyState: track?.readyState,
@@ -135,7 +146,7 @@ const VideoTile = memo(({
       });
 
       if (!track) {
-        logger.wall(`VideoTile [${participant.user_name}]: No track to attach, cleaning up`);
+        logger.wall(`VideoTile [${participantName}]: No track to attach, cleaning up`);
         cleanupStream();
         setHasVideo(false);
         return false;
@@ -145,14 +156,14 @@ const VideoTile = memo(({
       streamRef.current = resolvedStream;
       lastTrackIdRef.current = track.id;
 
-      logger.wall(`VideoTile [${participant.user_name}]: Stream created, attaching to video element`);
+      logger.wall(`VideoTile [${participantName}]: Stream created, attaching to video element`);
 
       if (videoRef.current) {
         videoRef.current.srcObject = resolvedStream;
-        logger.wall(`VideoTile [${participant.user_name}]: srcObject set, attempting playback`);
+        logger.wall(`VideoTile [${participantName}]: srcObject set, attempting playback`);
         void attemptPlayback();
       } else {
-        logger.warn(`VideoTile [${participant.user_name}]: Video element not available yet`);
+        logger.warn(`VideoTile [${participantName}]: Video element not available yet`);
       }
 
       setHasVideo(true);
@@ -176,7 +187,7 @@ const VideoTile = memo(({
         (latestParticipant.tracks?.video as { persistentTrack?: MediaStreamTrack })?.persistentTrack ??
         null;
 
-      logger.wall(`VideoTile [${participant.user_name}]: updateVideoTrack`, {
+      logger.wall(`VideoTile [${participantName}]: updateVideoTrack`, {
         videoTrack: videoTrack?.id,
         readyState: videoTrack?.readyState,
         videoState,
@@ -190,7 +201,7 @@ const VideoTile = memo(({
       const shouldSkip = !videoTrack || videoTrack.readyState === "ended";
 
       if (shouldSkip) {
-        logger.wall(`VideoTile [${participant.user_name}]: Skipping track update`, { 
+        logger.wall(`VideoTile [${participantName}]: Skipping track update`, { 
           videoTrack: !!videoTrack, 
           readyState: videoTrack?.readyState, 
           videoState,
@@ -206,14 +217,14 @@ const VideoTile = memo(({
       }
 
       if (lastTrackIdRef.current === videoTrack.id && videoRef.current?.srcObject) {
-        logger.wall(`VideoTile [${participant.user_name}]: Track already attached`);
+        logger.wall(`VideoTile [${participantName}]: Track already attached`);
         setHasVideo(true);
         setIsLoading(false);
         setConnectionStatus('connected');
         return;
       }
 
-      logger.wall(`VideoTile [${participant.user_name}]: Attaching new track`, videoTrack.id, 'with state:', videoState);
+      logger.wall(`VideoTile [${participantName}]: Attaching new track`, videoTrack.id, 'with state:', videoState);
       attachTrackToElement(videoTrack);
     };
 
@@ -227,16 +238,16 @@ const VideoTile = memo(({
     updateVideoTrack();
 
     const handleRelevantChange = (sessionId?: string) => {
-      if (sessionId === participant.session_id) {
+      if (sessionId === participantSessionId) {
         updateVideoTrack();
       }
     };
 
     const handleTrackStarted = (event: DailyEventObjectTrack) => {
-      logger.wall(`VideoTile [${participant.user_name}]: track-started event`, {
+      logger.wall(`VideoTile [${participantName}]: track-started event`, {
         trackKind: event.track?.kind,
         participantId: event.participant?.session_id,
-        matchesThisParticipant: event.participant?.session_id === participant.session_id,
+        matchesThisParticipant: event.participant?.session_id === participantSessionId,
       });
 
       if (event.track?.kind !== "video") {
@@ -244,11 +255,11 @@ const VideoTile = memo(({
       }
 
       const participantId = event.participant?.session_id;
-      if (participantId === participant.session_id) {
+      if (participantId === participantSessionId) {
         const incomingTrack = event.track ?? null;
         const incomingStream = incomingTrack ? new MediaStream([incomingTrack]) : null;
 
-        logger.wall(`VideoTile [${participant.user_name}]: Received track-started for this participant`);
+        logger.wall(`VideoTile [${participantName}]: Received track-started for this participant`);
         if (!attachTrackToElement(incomingTrack, incomingStream ?? undefined)) {
           handleRelevantChange(participantId);
         }
@@ -258,7 +269,7 @@ const VideoTile = memo(({
     };
 
     const handleTrackStopped = (event: DailyEventObjectTrack) => {
-      if (event.track?.kind === "video" && event.participant?.session_id === participant.session_id) {
+      if (event.track?.kind === "video" && event.participant?.session_id === participantSessionId) {
         cleanupStream();
         setHasVideo(false);
         setTrackState("stopped");
@@ -270,7 +281,7 @@ const VideoTile = memo(({
     };
 
     const handleParticipantLeft = (event: { action: string; participant?: DailyParticipant }) => {
-      if (event.participant?.session_id === participant.session_id) {
+      if (event.participant?.session_id === participantSessionId) {
         cleanupStream();
         setHasVideo(false);
       }
@@ -293,7 +304,7 @@ const VideoTile = memo(({
       cleanupStream();
       setHasVideo(false);
     };
-  }, [participant, callObject, participant.tracks?.video?.state, participant.tracks?.video?.track?.id]);
+  }, [callObject, participantName, participantSessionId, currentVideoTrackId]);
 
   useEffect(() => {
     if (!hasVideo || !videoRef.current) {
