@@ -24,7 +24,7 @@ Production needs:
 5. Set the application build type to `Dockerfile`.
 6. Use `Dockerfile` for the Dockerfile path and `.` for the Docker context path.
 
-The Docker image runs `npx prisma generate` during build and starts the standalone Next.js server with `node server.js`.
+The Docker image runs `npx prisma generate` during build. At container start, an entrypoint script syncs the database schema (`prisma migrate deploy` if a `prisma/migrations` directory exists, otherwise `prisma db push`) and then starts the standalone Next.js server with `node server.js`. No manual migration step is required on deploy.
 
 ### 2. Configure the Application
 
@@ -83,16 +83,21 @@ If the build succeeds but the domain returns a bad gateway:
 
 ### 4. Initialize the Database
 
-Run this once after PostgreSQL is available and the app has deployed:
+Schema sync runs automatically on every container start, so PostgreSQL only needs to be reachable when the app boots.
 
-```bash
-npx prisma db push
-node prisma/seed.mjs
+To seed the initial admin user (from `ADMIN_EMAIL` / `ADMIN_PASSWORD`) and sample churches on the next start, set:
+
+```env
+RUN_SEED_ON_START=true
 ```
 
-Run those commands inside the production app container or from a trusted machine with `DATABASE_URL` pointed at the production database.
+The seed script is idempotent — it skips records that already exist — but you can remove the variable after the first successful boot.
 
-The seed script creates the initial admin account from `ADMIN_EMAIL` and `ADMIN_PASSWORD` when provided.
+To run the seed manually instead, exec into the running app container:
+
+```bash
+node prisma/seed.mjs
+```
 
 ## Migrating from Coolify to Dokploy
 
