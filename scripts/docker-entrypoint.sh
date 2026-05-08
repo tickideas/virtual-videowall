@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-PRISMA_BIN="node ./node_modules/prisma/build/index.js"
+PRISMA_BIN="node /app/.cli/node_modules/prisma/build/index.js"
 
 echo "▶ Applying database schema..."
 if [ -d "./prisma/migrations" ] && [ -n "$(ls -A ./prisma/migrations 2>/dev/null)" ]; then

@@ -31,13 +31,17 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
-# Copy node_modules needed at runtime.
-# The standalone build includes minimal dependencies; we add what the entrypoint and
-# seed script need: bcryptjs (seed) and the prisma CLI + engines (schema sync).
+# Runtime deps for the standalone server.
+# The standalone build copies a traced, minimal node_modules; we add bcryptjs
+# so the seed script can hash the admin password.
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/bcryptjs ./node_modules/bcryptjs
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/@types ./node_modules/@types
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+
+# Prisma CLI runtime (used only by docker-entrypoint.sh for schema sync).
+# The CLI pulls in many transitive deps (effect, @prisma/config, engines, etc.),
+# so we copy the full deps node_modules under a separate path rather than
+# cherry-picking. This keeps the standalone server's node_modules lean.
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules /app/.cli/node_modules
 
 COPY --chown=nextjs:nodejs scripts/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
